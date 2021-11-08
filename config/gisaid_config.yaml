@@ -1,0 +1,6 @@
+#GISAID CONFIG
+percent_n: 50
+metadata_file: "/Users/sevillas2/Desktop/APHL/test_data/OH-123/metadata_29oct2021.csv"
+
+#sh run_gisaid.sh -p initialize -o /Users/sevillas2/Desktop/APHL/test_data/OH-123
+#sh /Users/sevillas2/Desktop/APHL/ODH-COVID19/run_gisaid.sh -p run -o /Users/sevillas2/Desktop/APHL/test_data/OH-123
