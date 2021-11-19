@@ -1,5 +1,18 @@
 #!/bin/bash
 
+##INFO
+# Initialize
+# - copies config file to the output dir
+
+# run
+# - creates /output/dir/GISAID_Complete/
+# - creates /output/dir/GISAID_Complete/timestamp/
+# - copies /output/dir/config.yaml to /output/dir/GISAID_Complete/timestamp/
+# - copies /pipeline/scripts/gisaid.sh to /output/dir/GISAID_Complete/timestamp/
+#
+
+
+
 #########################################################
 # Arguments
 #########################################################
@@ -58,12 +71,16 @@ check_initialization(){
 }
 
 #########################################################  
-# Formatting
+# Set variables
 #########################################################
 log_time=`date +"%Y%m%d_%H%M"`
 
 #remove trailing / on directories
 output_dir=$(echo $output_dir | sed 's:/*$::')
+
+#set dir
+complete_dir="$output_dir/GISAID_Complete/"
+run_dir="$complete_dir/$log_time"
 
 #########################################################
 # parse yaml
@@ -85,7 +102,7 @@ if [[ $pipeline = "initialize" ]]; then
 
   for f in ${files_save[@]}; do
     IFS='/' read -r -a strarr <<< "$f"
-    if [[ ! -f "${output_dir}/${strarr[1]}" ]]; then cp $f "${output_dir}/${strarr[1]}"; fi
+    if [[ ! -f "${output_dir}/${strarr[1]}" ]]; then cp $f "${complete_dir}/${strarr[1]}"; fi
   done
   
   #output complete
@@ -95,41 +112,36 @@ if [[ $pipeline = "initialize" ]]; then
 ####################### RUN #######################
 #Run check of pipeline OR run pipeline locally/cluster
 elif [[ $pipeline = "run" ]]; then
-  echo
-  echo "*********Running pipeline*********"
+   echo
+   echo "*********Running pipeline*********"
 
-  ####################### Preparation
-  #run output, config check
-  check_initialization
-  
-  #set dir
-  run_dir="$output_dir/$log_time"
-  merged_dir="$run_dir/merged_upload"
-  failed_dir="$run_dir/failed_qc"
+   ####################### Preparation
+   #run output, config check
+   check_initialization
 
-   rm -r /Users/sevillas2/Desktop/APHL/test_data/OH-123/202111*
+   #testing - remove previous runs
+   rm -r /Users/sevillas2/Desktop/APHL/demo/OH-123/GISAID_Complete/*
 
-  #create subdirectory structure
-  if [[ ! -d "${run_dir}" ]]; then mkdir "${run_dir}"; fi
-  if [[ ! -d "${merged_dir}" ]]; then mkdir "${merged_dir}"; fi
-  if [[ ! -d "${failed_dir}" ]]; then mkdir "${failed_dir}"; fi
+   #create subdirectory structure
+   if [[ ! -d "${complete_dir}" ]]; then mkdir "${complete_dir}"; fi
+   if [[ ! -d "${run_dir}" ]]; then mkdir "${run_dir}"; fi
 
-  # copy config inputs with time_stamp
-  files_save=("${output_dir}/gisaid_config.yaml" "scripts/gisaid.sh")
+   # copy config inputs with time_stamp
+   files_save=("${complete_dir}/gisaid_config.yaml" "scripts/gisaid.sh")
 
-  for f in ${files_save[@]}; do
-    IFS='/' read -r -a strarr <<< "$f"
-    cp $f "${run_dir}/${strarr[${#strarr[@]}-1]}"
-  done
+   for f in ${files_save[@]}; do
+      IFS='/' read -r -a strarr <<< "$f"
+      cp $f "${run_dir}/${strarr[${#strarr[@]}-1]}"
+   done
 
-  #parse config
-  eval $(parse_yaml ${output_dir}/gisaid_config.yaml "config_")
+   #parse config
+   eval $(parse_yaml ${output_dir}/gisaid_config.yaml "config_")
 
-  #run script
-  sh ${run_dir}/gisaid.sh \
-  $output_dir \
-  $run_dir \
-  ${config_metadata_file} \
-  ${config_percent_n}
+   #run script
+   sh ${run_dir}/gisaid.sh \
+   ${config_project_dir} \
+   $run_dir \
+   ${config_metadata_file} \
+   ${config_percent_n}
 
 fi
