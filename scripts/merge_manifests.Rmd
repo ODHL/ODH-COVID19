@@ -1,0 +1,145 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+# Purpose
+Merge multiple manifests into one master manifest for GISAD upload
+
+```{r}
+library(dplyr)
+```
+
+
+#Set dir paths
+```{r}
+input_dir="~/../../Users/sevillas2/Desktop/APHL/demo/metadata"
+output_dir="~/../../Users/sevillas2/Desktop/APHL/demo/metadata"
+
+```
+
+#handle manifests by type
+```{r}
+#pull in expanded
+file_list=c("Copy of SARS_LITS_IDs_2.3_1.27_1.22.csv")
+meta_df1 = read.csv(paste0(input_dir,"/",file_list[1]))
+meta_df1 = dplyr::select(meta_df1,-c("X"))
+meta_df1 = meta_df1 %>% 
+  filter(across(everything(),
+                ~ !is.na(.)))
+
+#pull in short
+file_list=c("meta_18feb_8mar.csv", "meta_2_5apr.csv", "meta_4-20-2021.csv" ,"meta_5-18-2021.csv", 
+            "Metadata 08.06.21.csv", "metadata_29oct2021.csv", "metadata_5nov2021.csv", 
+            "newwgsdata_22mar2021 - 03222021.csv","newwgsdata_22mar2021 - 03242021.csv", 
+            "newwgsdata_22mar2021.csv")
+
+for (i in 1:length(file_list)){
+  if (i==1){
+  meta_df2=read.csv(paste0(input_dir,"/",file_list[1]))
+  } else{
+      merge.data.frame(meta_df2,
+                       read.csv(paste0(input_dir,"/",file_list[i])),
+                       all = TRUE)
+    }
+    i = i+1
+}
+meta_df2$origin = meta_df2$Specimen_ID
+meta_df2 = dplyr::select(meta_df2,-c("X"))
+```
+
+#standardize cols
+```{r}
+fix_dates<-function(input_col){
+  date_month=as.numeric(sapply(strsplit(as.character(input_col),'/'), "[", 1))
+  date_day=as.numeric(sapply(strsplit(as.character(input_col),'/'), "[", 2))
+  date_year=as.numeric(sapply(strsplit(as.character(input_col),'/'), "[", 3))
+  
+  #make all two digits
+  for (i in 1:length(date_month)){if(as.numeric(date_month[i]) < 10){date_month[i]=paste0("0",date_month[i])}}
+  for (i in 1:length(date_day)){if(as.numeric(date_day[i]) < 10){date_day[i]=paste0("0",date_day[i])}}
+  for (i in 1:length(date_year)){if(as.numeric(date_year[i]) < 10){date_year[i]=paste0("0",date_year[i])}}
+  
+  #add 19 or 20 to year
+  for (i in 1:length(date_year)){
+    if(as.numeric(date_year[i]) < 1900){
+      if(as.numeric(date_year[i]) < 22){
+        date_year[i]=paste0("20",date_year[i])  
+      } else{
+        date_year[i]=paste0("19",date_year[i])
+      }
+    }
+  }
+  
+  output_col=paste0(date_year,"-",date_month,"-",date_day)
+  return(output_col)
+}
+```
+
+#expanded
+```{r}
+meta_df1_clean = meta_df1 %>%
+  rename(
+    date_collected = Specimen.Date.Collected.,
+    miseq_library = MiSeq.Library,
+    dob = Patient.DOB,
+    gender = Patient.Gender,
+    county = Patient.City,
+    source = Specimen.Type,
+    lab_origin = Submitter.Name,
+    sampleid_origin = LITS.Number,
+    sampleid_submitting = Sample.Name
+  ) %>%
+  select(c("date_collected","miseq_library",
+           "dob", "gender", "county", "source",
+           "lab_origin", "sampleid_origin", "sampleid_submitting"))
+
+#fix dates, calculate age
+meta_df1_clean$date_collected = fix_dates(meta_df1_clean$date_collected)
+meta_df1_clean$dob = fix_dates(meta_df1_clean$dob)
+meta_df1_clean$age = as.numeric(sapply(strsplit(as.character(meta_df1_clean$date_collected),'-'), "[", 1)) -
+  as.numeric(sapply(strsplit(as.character(meta_df1_clean$dob),'-'), "[", 1))
+
+#fix gender
+meta_df1_clean$gender[meta_df1_clean$gender==""] <- "unknown"
+meta_df1_clean$gender[meta_df1_clean$gender=="FEMALE"] <- "female"
+meta_df1_clean$gender[meta_df1_clean$gender=="MALE"] <- "male"
+
+#fix source type
+meta_df1_clean$source <- "Oro-pharyngeal swab"
+```
+
+#short
+```{r}
+meta_df2_clean = meta_df2 %>%
+  rename(
+    date_collected = collected,
+    dob = p_birthdate,
+    county = p_county,
+    sampleid_origin = origin,
+    sampleid_submitting = Specimen_ID
+  ) %>%
+  select(c("date_collected","dob", "county","sampleid_origin", "sampleid_submitting"))
+
+#fix dates, calculate age
+meta_df2_clean$date_collected = fix_dates(meta_df2_clean$date_collected)
+meta_df2_clean$dob = fix_dates(meta_df2_clean$dob)
+meta_df2_clean$age = as.numeric(sapply(strsplit(as.character(meta_df2_clean$date_collected),'-'), "[", 1)) -
+  as.numeric(sapply(strsplit(as.character(meta_df2_clean$dob),'-'), "[", 1))
+```
+
+#complete merge
+```{r}
+head(meta_df1_clean)
+head(meta_df2_clean)
+
+meta_merged = merge.data.frame(meta_df1_clean,meta_df2_clean,all=TRUE)
+meta_merged[is.na(meta_merged)]="unknown"
+tail(meta_merged)
+write.csv(meta_merged,
+          paste0(output_dir,"/merged_complete.csv"),
+          row.names = FALSE)
+```
+
