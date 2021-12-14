@@ -1,0 +1,31 @@
+#GISAID CONFIG
+percent_n: 50
+metadata_file: "/Users/sevillas2/Desktop/APHL/demo/OH-123/merged_complete.csv"
+project_dir: "/Users/sevillas2/Desktop/APHL/demo/OH-123/"
+
+#upload requirements
+## mandatory
+submitter: "sevillas2"
+type:	"betacoronavirus"
+passage: "Original"
+host: "Human"
+gender: "unkown"
+patient_status: "unknown"
+sequencing_technology: "Illumina Miseq"
+submitting_lab: "Ohio Department of Health Laboratory"
+address_submitting: "8995 East Main Street, Reynoldsburg, Ohio 43068"
+authors: "Jennifer Holmes, Eric Brandt, Keoni Omura, Glen McGillivary, Caitlin McDonnell, Jade Mowery, Stephanie Mccracken, Tyler Payne, Kirtana Ramadugu, Erica Leasure, Brent Lee, Kelsey Florek, Heather Blankenship, Allison Black, Quanta Brown, Tammy Bannerman, Samantha Sevilla"
+
+## optional
+additional_location_information: ""
+additional_host_information: ""
+sampling_strategy: ""
+specimen_source: ""
+outbreak: ""
+last_vaccinated: ""
+treatment: ""
+assembly_method: ""
+coverage: ""
+
+#sh run_gisaid.sh -p initialize -o /Users/sevillas2/Desktop/APHL/test_data/OH-123
+#sh /Users/sevillas2/Desktop/APHL/ODH-COVID19/run_gisaid.sh -p run -o /Users/sevillas2/Desktop/APHL/test_data/OH-123
