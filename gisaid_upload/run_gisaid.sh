@@ -51,26 +51,31 @@ check_initialization(){
   fi
 }
 
+
+#########################################################  
+# Format Directories
+#########################################################
+#add backslash if spaces are in directory
+#output_dir=$(echo $output_dir | awk ' { gsub(" ","\\ "); print $0 }')
+
+#remove trailing / on directories
+output_dir=$(echo $output_dir | sed 's:/*$::')
+
 #########################################################  
 # Set variables
 #########################################################
 log_time=`date +"%Y%m%d_%H%M"`
 upload_time=`date +"%Y%m%d"`
 
-#remove trailing / on directories
-output_dir=$(echo $output_dir | sed 's:/*$::')
-
 #set dir
 complete_dir="$output_dir/GISAID_Complete"
 run_dir="$complete_dir/$log_time"
 
-echo $complete_dir
-
 #########################################################  
 # Create dirs
 #########################################################
-if [[ ! -d $complete_dir ]]; then mkdir -p $complete_dir; fi
-if [[ ! -d $run_dir ]]; then mkdir -p $run_dir; fi
+if [[ ! -d $complete_dir ]]; then mkdir -p "${complete_dir}" ; fi
+if [[ ! -d $run_dir ]]; then mkdir -p "${run_dir}"; fi
 
 #########################################################
 # Code
@@ -85,12 +90,12 @@ if [[ $pipeline = "initialize" ]]; then
   files_save=('config/gisaid_config.yaml')
 
   for f in ${files_save[@]}; do
-   IFS='/' read -r -a strarr <<< "$f"
-   if [[ ! -f "${output_dir}/${strarr[1]}" ]]; then \
-      cp $f "${output_dir}/${strarr[1]}"
-   else
-      echo "-Config already in output dir"
-   fi
+	IFS='/' read -r -a strarr <<< "$f"
+	if [[ ! -f "${output_dir}/${strarr[1]}" ]]; then \
+		cp $f "${output_dir}/${strarr[1]}"
+	else
+		echo "-Config already in output dir"
+	fi
   done
   
   #output complete
@@ -100,39 +105,31 @@ if [[ $pipeline = "initialize" ]]; then
 ####################### RUN #######################
 #Run check of pipeline OR run pipeline locally/cluster
 elif [[ $pipeline = "run" ]]; then
-   echo
-   echo "*********Running pipeline*********"
+	echo
+	echo "*********Running pipeline*********"
 
-   ####################### Preparation
-   #run output, config check
-   check_initialization
+	####################### Preparation
+	#run output, config check
+	check_initialization
 
-   #testing - remove previous runs
-   rm -r /Users/sevillas2/Desktop/APHL/demo/OH-123/GISAID_Complete/*
+	#copy config inputs with time_stamp
+	files_save=("scripts/gisaid.sh")
 
-   #create subdirectory structure
-   if [[ ! -d "${complete_dir}" ]]; then mkdir "${complete_dir}"; fi
-   if [[ ! -d "${run_dir}" ]]; then mkdir "${run_dir}"; fi
+	for f in ${files_save[@]}; do
+		IFS='/' read -r -a strarr <<< "$f"
+		cp $f "${run_dir}/${strarr[${#strarr[@]}-1]}"
+	done
 
-   # copy config inputs with time_stamp
-   files_save=("${output_dir}/gisaid_config.yaml" "scripts/gisaid.sh")
+	cp "${output_dir}"/gisaid_config.yaml "${run_dir}"/gisaid_config.yaml 
 
-   for f in ${files_save[@]}; do
-      IFS='/' read -r -a strarr <<< "$f"
-      cp $f "${run_dir}/${strarr[${#strarr[@]}-1]}"
-   done
+	#required file name schema: YYYYMMDD_a_descriptive_name_metadata.xls
+	IFS='/' read -r -a strarr <<< ""${output_dir}""
+	project_name="${strarr[${#strarr[@]}-1]}"
+	cp "config/20210222_Template.xls" "${run_dir}"/${upload_time}_${project_name}_metadata.xls
 
-   #rename template for upload
-   f="config/20210222_Template.xls"
-   IFS='/' read -r -a strarr <<< "$output_dir"
-   project_name="${strarr[${#strarr[@]}-1]}"
-   
-   #required file name schema: YYYYMMDD_a_descriptive_name_metadata.xls
-   cp $f "${run_dir}/${upload_time}_${project_name}_metadata.xls"
+	#run script
+	sh ${run_dir}/gisaid.sh $run_dir
 
-   #run script
-   sh ${run_dir}/gisaid.sh $run_dir
-
-   echo "*********Completed pipeline*********"
-   echo
+	echo "*********Completed pipeline*********"
+	echo
 fi
