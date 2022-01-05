@@ -31,28 +31,66 @@ meta_df1 = meta_df1 %>%
                 ~ !is.na(.)))
 
 #pull in short
-file_list=c("meta_18feb_8mar.csv", "meta_2_5apr.csv", "meta_4-20-2021.csv" ,"meta_5-18-2021.csv", 
-            "Metadata 08.06.21.csv", "metadata_29oct2021.csv", "metadata_5nov2021.csv", 
-            "newwgsdata_22mar2021 - 03222021.csv","newwgsdata_22mar2021 - 03242021.csv", 
-            "newwgsdata_22mar2021.csv")
+file_list=c("meta_2_5apr.csv", "meta_4-20-2021.csv", "meta_5-18-2021.csv", "meta_8-31-2021.csv", "meta_9-14-2021.csv", "meta_18feb_8mar.csv", "Metadata 08.06.21.csv", "metadata_1oct2021_1.csv", "metadata_5nov2021.csv", "metadata_7dec2021.csv", "metadata_24nov2021 - Nov 8th run.csv", "metadata_24nov2021_2 - Nov 15.csv", "metadata_24nov2021_2.csv", "metadata_24nov2021.csv",  "metadata_29oct2021.csv",  "newwgsdata_22mar2021 - 03222021.csv","newwgsdata_22mar2021 - 03242021.csv", "newwgsdata_22mar2021.csv",  "metadata_1oct2021.csv")
 
+i=1
 for (i in 1:length(file_list)){
   if (i==1){
   meta_df2=read.csv(paste0(input_dir,"/",file_list[1]))
   } else{
-      merge.data.frame(meta_df2,
+    meta_df2 = merge.data.frame(meta_df2,
                        read.csv(paste0(input_dir,"/",file_list[i])),
                        all = TRUE)
     }
     i = i+1
 }
-meta_df2$origin = meta_df2$Specimen_ID
+
+#handle specimen id
+meta_df2$origin=""
+for(rowid in 1:nrow(meta_df2)){
+  if(is.na(meta_df2[rowid,"Specimen_ID"])){
+    meta_df2[rowid,"origin"]=meta_df2[rowid,"specimen_id"]
+  } else{
+    meta_df2[rowid,"origin"]=meta_df2[rowid,"Specimen_ID"]
+  }
+}
+
+#handle birthday
+for(rowid in 1:nrow(meta_df2)){
+  if(is.na(meta_df2[rowid,"p_birthdate"])){
+    meta_df2[rowid,"p_birthdate"]=meta_df2[rowid,"birth_date"]
+  }
+}
+
+#handle collection
+for(rowid in 1:nrow(meta_df2)){
+  if(is.na(meta_df2[rowid,"collected"])){
+    meta_df2[rowid,"collected"]=meta_df2[rowid,"collect_date"]
+  }
+}
+
+#handle country
+for(rowid in 1:nrow(meta_df2)){
+  if(is.na(meta_df2[rowid,"p_county"])){
+    meta_df2[rowid,"p_county"]=meta_df2[rowid,"pt_county"]
+  }
+}
 meta_df2 = dplyr::select(meta_df2,-c("X"))
 ```
 
 #standardize cols
 ```{r}
 fix_dates<-function(input_col){
+  
+  #if any date has -, revert to /
+  for (i in 1:length(input_col)){
+    if(grepl("-",input_col[i], fixed = TRUE)){
+      input_col[i] = paste0(strsplit(as.character(input_col[i]),'-')[[1]][2],"/",
+                            strsplit(as.character(input_col[i]),'-')[[1]][3],"/",
+                            strsplit(as.character(input_col[i]),'-')[[1]][1])
+    }
+  }
+  
   date_month=as.numeric(sapply(strsplit(as.character(input_col),'/'), "[", 1))
   date_day=as.numeric(sapply(strsplit(as.character(input_col),'/'), "[", 2))
   date_year=as.numeric(sapply(strsplit(as.character(input_col),'/'), "[", 3))
@@ -76,10 +114,8 @@ fix_dates<-function(input_col){
   output_col=paste0(date_year,"-",date_month,"-",date_day)
   return(output_col)
 }
-```
 
 #expanded
-```{r}
 meta_df1_clean = meta_df1 %>%
   rename(
     date_collected = Specimen.Date.Collected.,
@@ -109,10 +145,8 @@ meta_df1_clean$gender[meta_df1_clean$gender=="MALE"] <- "male"
 
 #fix source type
 meta_df1_clean$source <- "Oro-pharyngeal swab"
-```
 
 #short
-```{r}
 meta_df2_clean = meta_df2 %>%
   rename(
     date_collected = collected,
@@ -122,6 +156,11 @@ meta_df2_clean = meta_df2 %>%
     sampleid_submitting = Specimen_ID
   ) %>%
   select(c("date_collected","dob", "county","sampleid_origin", "sampleid_submitting"))
+meta_df2_clean$sampleid_submitting=meta_df2_clean$sampleid_origin
+
+#remove data missing dates
+meta_df2_clean=subset(meta_df2_clean,date_collected!="")
+meta_df2_clean=subset(meta_df2_clean,dob!="")
 
 #fix dates, calculate age
 meta_df2_clean$date_collected = fix_dates(meta_df2_clean$date_collected)
