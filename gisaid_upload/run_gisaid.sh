@@ -4,13 +4,21 @@
 # Initialize
 # - copies config file to the output dir
 
-# run
-# - creates /output/dir/GISAID_Complete/
-# - creates /output/dir/GISAID_Complete/timestamp/
-# - copies /output/dir/config.yaml to /output/dir/GISAID_Complete/timestamp/
-# - copies /pipeline/scripts/gisaid.sh to /output/dir/GISAID_Complete/timestamp/
+# batch
+# - creates /output/dir/GISAID_logs/
+# - creates /output/dir/GISAID_logs/timestamp/
+# - creates /output/dir/fastas_GISAID_uploaded
+# - creates /output/dir/fastas_GISAID_errors
+# - copies /output/dir/config.yaml to /output/dir/GISAID_logs/timestamp/
+# - copies /pipeline/scripts/gisaid.sh to /output/dir/GISAID_logs/timestamp/
+
+# error
+# - copies files from column1 of /output/dir/fastas_GISAID_errors/error_log.txt:
+# /output/dir/fastas_GISAID_uploaded to /output/dir/fastas_GISAID_errors
 
 #cd /Users/sevillas2/Desktop/APHL/ODH-COVID19/; sh run_gisaid.sh -p run -o /Users/sevillas2/Desktop/APHL/demo/OH-123
+#cd "/l/Micro/Gen Micro/Whole Genome Sequencing/Coronavirus_WGS/COVID-19 Fastas/Sam/ODH-COVID19-main/gisaid_upload"; \
+#sh run_gisaid.sh -p run -o "/l/Micro/Gen Micro/Whole Genome Sequencing/Coronavirus_WGS/COVID-19 Fastas/"
 
 #########################################################
 # Arguments
@@ -20,7 +28,7 @@ helpFunction()
 {
    echo ""
    echo "Usage: $0 -p pipeline options"
-   echo -e "\t-p options: initialize, run, rerun"
+   echo -e "\t-p options: initialize, batch, error"
    echo "Usage: $1 -o output_dir"
    echo -e "\t-o path to output directory"
    exit 1 # Exit script after printing help
@@ -51,13 +59,9 @@ check_initialization(){
   fi
 }
 
-
 #########################################################  
 # Format Directories
 #########################################################
-#add backslash if spaces are in directory
-#output_dir=$(echo $output_dir | awk ' { gsub(" ","\\ "); print $0 }')
-
 #remove trailing / on directories
 output_dir=$(echo $output_dir | sed 's:/*$::')
 
@@ -68,14 +72,19 @@ log_time=`date +"%Y%m%d_%H%M"`
 upload_time=`date +"%Y%m%d"`
 
 #set dir
-complete_dir="$output_dir/GISAID_Complete"
-run_dir="$complete_dir/$log_time"
+parent_log_dir="$output_dir/GISAID_logs"
+run_dir="$parent_log_dir/$log_time"
+fastas_dir="$output_dir/fastas_GISAID_uploaded"
+error_dir="$output_dir/fastas_GISAID_errors"
+error_log="$error_dir/error_log.txt"
 
 #########################################################  
-# Create dirs
+# Create dirs, logs
 #########################################################
-if [[ ! -d $complete_dir ]]; then mkdir -p "${complete_dir}" ; fi
-if [[ ! -d $run_dir ]]; then mkdir -p "${run_dir}"; fi
+if [[ ! -d $parent_log_dir ]]; then mkdir -p "${parent_log_dir}" ; fi
+if [[ ! -d $fastas_dir ]]; then mkdir -p "${fastas_dir}" ; fi
+if [[ ! -d $error_dir ]]; then mkdir -p "${error_dir}" ; fi
+if [[ ! -f $error_log ]]; then touch "$error_log"; fi
 
 #########################################################
 # Code
@@ -103,12 +112,15 @@ if [[ $pipeline = "initialize" ]]; then
   echo
 
 ####################### RUN #######################
-#Run check of pipeline OR run pipeline locally/cluster
-elif [[ $pipeline = "run" ]]; then
+#Run batch pipeline locally
+elif [[ $pipeline = "batch" ]]; then
 	echo
-	echo "*********Running pipeline*********"
+	echo "*********Starting pipeline*********"
 
 	####################### Preparation
+	if [[ ! -d $run_dir ]]; then mkdir -p "${run_dir}"; fi
+
+	echo "---------Preparing Configs"
 	#run output, config check
 	check_initialization
 
@@ -127,9 +139,31 @@ elif [[ $pipeline = "run" ]]; then
 	project_name="${strarr[${#strarr[@]}-1]}"
 	cp "config/20210222_Template.xls" "${run_dir}"/${upload_time}_${project_name}_metadata.xls
 
-	#run script
-	sh ${run_dir}/gisaid.sh $run_dir
+	######################## run script
+	echo "---------Running Script"
+	sh scripts/gisaid.sh "${run_dir}" "${fastas_dir}" 2> "${run_dir}"/warnings.txt
 
+	echo "*********Completed pipeline*********"
+	echo
+elif [[ $pipeline = "error" ]]; then
+	echo
+	echo "*********Starting error pipeline*********"
+
+	####################### run process
+	echo "---------handling errors"
+	#read text file with errors, move fasta files to error dir
+	for virus_name in $(cut -f1 "$error_log"); do
+	
+		#get id from virus name
+		base_name=`echo $virus_name | grep -o -P '(?<=OH-).*(?=/)'`
+		
+		#create file name
+		file_name="${base_name}_consensus.fasta"
+		
+		#move files
+		mv "$fastas_dir"/$file_name "$error_dir" 2> "${error_dir}"/warnings.txt
+	done
+	
 	echo "*********Completed pipeline*********"
 	echo
 fi
