@@ -2,6 +2,7 @@
 # ARGS
 #########################################################
 run_dir=$1
+fastas_dir=$2
 
 #########################################################
 # functions
@@ -52,9 +53,9 @@ yaml_location="${run_dir}"/gisaid_config.yaml
 # Code
 #########################################################
 #create files to track changes
-merged_fasta_dir="$run_dir/merged_fastas"
-failed_list="$merged_fasta_dir/qc_failed.txt"
-passed_list="$merged_fasta_dir/qc_passed.txt"
+echo "------------------Creating log files"
+failed_list="$run_dir/qc_failed.txt"
+passed_list="$run_dir/qc_passed.txt"
 batched_fasta="$run_dir/batched_fasta_input.fasta"
 batched_meta="$run_dir/batched_metadata_input.csv"
 touch "${failed_list}"
@@ -82,7 +83,15 @@ metadata_output "${header_2[@]}"
 
 # Parse FASTA file for N, create filtered lists
 #ls -1 "$project_dir"/"Fastas - GISAID Not Complete"
+echo "------------------Processing Samples"
 for f in `ls -1 "$project_dir"/"Fastas - GISAID Not Complete"`; do
+	#skip the log text file
+	if [[ "$f" == *".txt"* ]]; then continue; fi
+	
+	#id sample
+	echo "---------------------------$f"
+	
+	#set full file path
 	full_path="$project_dir"/"Fastas - GISAID Not Complete"/$f
 	
     #determine total number of seq
@@ -113,29 +122,21 @@ for f in `ls -1 "$project_dir"/"Fastas - GISAID Not Complete"`; do
         #create array, determine if need to concatonate
         IFS=' ' read -ra header_array <<< "$header_split"
 
-        #if there are multiple elements of header
-        if [[ ${#header_array[@]} -gt 1 ]]; then 
-
-            #check if sample is from 2021
-            if [[ "${header_array[1]}" == "2021" ]]; then
-                #if it is then new header is 2021 followed by number without SC
-                new_header="${header_array[1]}${header_array[0]}"
-            
-			#otherwise it's 2021 + 1 + number without SC
-            else
-                new_header="${header_array[1]}1${header_array[0]}"
-            fi 
-        else
-            new_header=${header_array[0]}
-        fi
+		#if the header starts with 202 then leave it alone
+		header_check=`echo ${header_array[0]} | cut -c1-4`
+		if [[ "$header_check" == "202"* ]]; then
+			new_header=${header_array[0]}
+		#otherwise add 202 to the header
+		else
+			new_header="202${header_array[0]}"
+		fi
 
         #find associated metadata
         config_metadata_file=$(cat "${yaml_location}" | grep "metadata_file: " | sed 's/metadata_file: //' | sed 's/"//g')
 		meta=`cat "$config_metadata_file" | grep "$new_header"`
 
         #if meta is found create input metadata row
-        if
-		[[ ! "$meta" == "" ]]; then
+        if [[ ! "$meta" == "" ]]; then
 			
             #the filename that contains the sequence without path (e.g. all_sequences.fasta not c:\users\meier\docs\all_sequences.fasta)
             IFS='/' read -r -a strarr <<< "$full_path"
@@ -148,15 +149,14 @@ for f in `ls -1 "$project_dir"/"Fastas - GISAID Not Complete"`; do
 			virus_name="hCoV*19/USA/OH*$new_header/$year"
 
             #Date in the format YYYY or YYYY-MM or YYYY-MM-DD
-            #convert date to format above 4/21/81	9/22/21
-            collection_date=`echo $meta | awk -F',' '{print $1}' | sed 's/-/*/g'`
+            #convert date to format above - 4/21/81 to 1981-04-21
+			collection_date=`echo $meta | awk -F',' '{print $1}' | sed 's/-/*/g'`
 
             #e.g. Europe / Germany / Bavaria / Munich
 			county=`echo ${meta} | awk -F',' '{print $3}'`
             location=`echo North-America/USA/$county | sed 's/"//g'`
 			
             #e.g.  65 or 7 months, or unknown 
-            #YYYY or YYYY-MM or YYYY-MM-DD
             patient_age=`echo $meta | awk -F',' '{print $6}'`
 
             #given by the originating laboratory
@@ -258,11 +258,12 @@ for f in `ls -1 "$project_dir"/"Fastas - GISAID Not Complete"`; do
             echo "$full_path" >> $passed_list
 			
             # merge all fasta files that pass QC and metadata into one
+			# skips the header line and any odd formatted /date lines that follow
             echo ">$virus_name" | sed 's/*/-/g' >> $batched_fasta
-			cat "$full_path" | grep -v ">" >> $batched_fasta
+			cat "$full_path" | grep -v ">" | grep -v "/" >> $batched_fasta
 			
 			#move merged files to completed dir
-			#mv "$full_path" "$merged_fasta_dir"/$f
+			mv "$full_path" "$fastas_dir"/$f
 
         #if meta is not found, add to failed list
         else
@@ -270,3 +271,8 @@ for f in `ls -1 "$project_dir"/"Fastas - GISAID Not Complete"`; do
         fi
     fi
 done
+
+#add qc failure log to not complete folder
+failed_compiled="$project_dir/Fastas - GISAID Not Complete/qc_failed.txt"
+if [[ ! -f "$failed_compiled" ]]; then touch "$failed_compiled"; fi
+cat "$failed_list" >> "$failed_compiled"
