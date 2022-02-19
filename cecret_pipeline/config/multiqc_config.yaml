@@ -39,6 +39,11 @@ pangolin:
   contents: pangolin_version
   num_lines: 1
 
+#samtools stats features
+samtools/stats:
+  contents: This file was produced by samtools stats
+  shared: true
+  
 module order:
         - 'fastQC'
         - 'dragen'
