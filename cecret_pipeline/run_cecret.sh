@@ -1,5 +1,17 @@
 #!/bin/bash
 
+
+#############################################################################################
+# Background documentation
+#############################################################################################
+# Basespace
+# https://developer.basespace.illumina.com/docs/content/documentation/cli/cli-examples#Downloadallrundata
+
+
+#############################################################################################
+# functions
+#############################################################################################
+
 helpFunction()
 {
    echo ""
@@ -16,12 +28,12 @@ helpFunction()
 
 while getopts "p:n:o:d:" opt
 do
-   case "$opt" in
-      p ) pipeline="$OPTARG" ;;
-      n ) project_name="$OPTARG" ;;
-      o ) output_dir="$OPTARG" ;;
-      d ) download_arg="$OPTARG" ;;
-      ? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
+   case "$opt" in 
+	p) pipeline="$OPTARG" ;;
+     	n ) project_name="$OPTARG" ;;
+      	o ) output_dir="$OPTARG" ;;
+      	d ) download_arg="$OPTARG" ;;
+      	? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
    esac
 done
 
@@ -30,12 +42,23 @@ if [ -z "$pipeline" ] || [ -z $project_name ] || [ -z "$output_dir" ]; then
    echo "Some or all of the parameters are empty";
    helpFunction
 fi
+
+check_initialization(){
+  if [[ ! -d $log_dir ]] || [[ ! -f "${log_dir}/gisaid_config.yaml" ]]; then
+    echo "ERROR: You must initalize the dir before beginning pipeline"
+    exit 1
+  fi
+}
+
 #############################################################################################
 # Config
 #############################################################################################
 #set args
-batch_limit=10
+batch_limit=70
 date_stamp="$(date '+%Y%m%d')"
+
+#remove trailing / on directories
+output_dir=$(echo $output_dir | sed 's:/*$::')
 
 #set dirs
 log_dir=$output_dir/logs
@@ -43,7 +66,6 @@ fastq_dir=$output_dir/fastq
 cecret_dir=$output_dir/cecret
 
 qc_dir=$output_dir/qc
-qcreport_dir=$qc_dir/covid19_qcreport
 
 tmp_dir=$output_dir/tmp
 fastqc_dir=$tmp_dir/fastqc
@@ -54,6 +76,9 @@ ivar_dir=$analysis_dir/ivar
 intermed_dir=$analysis_dir/intermed
 
 #make dirs
+##output
+if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
+
 ##parent
 dir_list=(logs fastq cecret qc tmp analysis)
 for pd in "${dir_list[@]}"; do
@@ -61,10 +86,10 @@ for pd in "${dir_list[@]}"; do
 done
 
 ##qc
-dir_list=(covid19_qcreport)
-for pd in "${dir_list[@]}"; do
-        if [[ ! -d $qc_dir/$pd ]]; then mkdir -p $qc_dir/$pd; fi
-done
+#dir_list=(covid19_qcreport)
+#for pd in "${dir_list[@]}"; do
+#        if [[ ! -d $qc_dir/$pd ]]; then mkdir -p $qc_dir/$pd; fi
+#done
 
 #tmp
 dir_list=(fastqc unzipped)
@@ -91,7 +116,26 @@ touch $pipeline_log
 #############################################################################################
 # Run CECRET
 #############################################################################################
-if [[ "$pipeline" == "run" ]]; then
+if [[ "pipeline" == "initialize" ]]; then
+
+  echo "*********Initializing pipeline*********"
+
+  # copy config inputs to edit if doesn't exit
+  files_save=('../config/gisaid_config.yaml')
+
+  for f in ${files_save[@]}; do
+        IFS='/' read -r -a strarr <<< "$f"
+        if [[ ! -f "${log_dir}/${strarr[1]}" ]]; then \
+                cp $f "${log_dir}/${strarr[1]}"
+        else
+                echo "-Config already in output dir"
+        fi
+  done
+
+  #output complete
+  echo "-Config is ready to be edited:\n--${log_dir}/gisaid_config.yaml"
+
+elif [[ "$pipeline" == "run" ]]; then
 	
 	#log
 	echo "*** STARTING PIPELINE ***"
@@ -160,6 +204,11 @@ if [[ "$pipeline" == "run" ]]; then
 		fi
 	done
 
+        #log
+        sample_number=`wc -l < $sample_id_file`
+        echo "--A total of $sample_number's will be processed in $batch_count batches, with a maximum of $batch_limit per batch"
+        echo "--A total of $sample_number's will be processed in $batch_count batches, with a maximum of $batch_limit per batch" >> $pipeline_log
+
 	#merge all batched outputs
         merged_samples=$log_dir/completed_samples.txt
         merged_cecret=$log_dir/cecret_results.txt
@@ -183,8 +232,8 @@ if [[ "$pipeline" == "run" ]]; then
 	echo "--Processing batches:" >> $pipeline_log
 
 	#for each batch
-	#for (( batch_id=1; batch_id<=$batch_count; batch_id++ )); do
-	for (( batch_id=1; batch_id<=2; batch_id++ )); do
+	for (( batch_id=1; batch_id<=$batch_count; batch_id++ )); do
+	#for (( batch_id=1; batch_id<=2; batch_id++ )); do
 	
 		echo "----Batch_$batch_id"
 		echo "----Batch_$batch_id" >> $pipeline_log
@@ -219,15 +268,14 @@ if [[ "$pipeline" == "run" ]]; then
                 	unzip -o -q $tmp_dir/${sample_id}_[0-9]*/*_all_output_files.zip -d $tmp_dir/${sample_id}
 
                 	#move needed files to general tmp dir
-                	#todo change cp to mv
-			sudo cp $tmp_dir/${sample_id}/ma/* $tmp_dir/unzipped
-
-                	#remove sample tmp dir
-                	rm -r --force $tmp_dir/${sample_id}
+			mv $tmp_dir/${sample_id}/ma/* $tmp_dir/unzipped
 
 			#move files to batch fasta dir
-			#todo change cp to mv
-			sudo cp $fastq_dir/${sample_id}*/*fastq.gz $fastq_batch_dir
+			mv $fastq_dir/${sample_id}*/*fastq.gz $fastq_batch_dir
+
+                        #remove sample tmp dir, downloaded proj dir
+                        rm -r --force $tmp_dir/${sample_id}
+			rm -r --force $tmp_dir/${sample_id}_[0-9]*/*_all_output_files.zip
         	done
 
 		#log
@@ -278,7 +326,6 @@ if [[ "$pipeline" == "run" ]]; then
 		sudo rm -r --force work
 		sudo rm -r --force $cecret_batch_dir
 		sudo rm -r --force $fastq_batch_dir
-
 	done
 
 	#############################################################################################
@@ -298,7 +345,10 @@ if [[ "$pipeline" == "run" ]]; then
         	-c $log_dir/multiqc_config.yaml \
         	$fastqc_dir \
         	$tmp_dir/unzipped \
-        	-o $qcreport_dir
+        	-o $qc_dir
+
+	#re-organize qc
+	mv $qc_dir/multiqc_report.html $analysis_dir
 
 	#create final results file
 	final_nextclade=$intermed_dir/final_nextclade.txt
@@ -319,9 +369,20 @@ if [[ "$pipeline" == "run" ]]; then
 	#create fragment plot
 	python scripts/fragment_plots.py $merged_fragment $analysis_dir/fragment_plot.png
 	
-	#remove all unneded files
-	#rm -r --force $tmp_dir
-	rm -r --force $cecret
+	#remove all proj files
+	rm -r --force $tmp_dir
+	rm -r --force $cecret_dir
+	rm -r --force $qc_dir
+	rm -r --force $fastq_dir
+	
+        #############################################################################################
+	# Run GISAID UPLOAD
+	#############################################################################################
+	echo "--GISAID Upload"
+	#bash gisaid.sh "${log_dir}" "${fasta_dir}"
+	#"${log_dir}"/${date_stamp}_${project_id}_metadata.csv 2> "${log_dir}"/gisaid_warnings.txt
+
+
 
 	#log
 	echo "***COMPLETED PIPELINE"
