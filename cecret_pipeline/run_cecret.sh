@@ -7,6 +7,11 @@
 # Basespace
 # https://developer.basespace.illumina.com/docs/content/documentation/cli/cli-examples#Downloadallrundata
 
+#Docker location
+# https://hub.docker.com/u/staphb
+
+#CECRET GitHub location
+# https://github.com/UPHL-BioNGS/Cecret
 
 #############################################################################################
 # functions
@@ -16,35 +21,35 @@ helpFunction()
 {
    echo ""
    echo "Usage: $1 -p pipeline options"
-   echo -e "\t-p options: run"
-   echo "Usage: $2 -n projet_name"
+   echo -e "\t-p options: run, init, update"
+   echo "Usage: $2 -n project_name"
    echo -e "\t-n project name"
-   echo "Usage: $3 -o output_dir"
-   echo -e "\t-o path to output directory"
-   echo "Usage: $4 -d download_arg"
-   echo -e "\t-d Y flag to download files"
+   echo "Usage: $3 -d download_arg"
+   echo -e "\t-d Y flag to download DRAGEN analysis files"
+   echo "Usage: $4 -t testing_arg"
+   echo -e "\t-t Y flag indicate if run is a test"
    exit 1 # Exit script after printing help
 }
 
-while getopts "p:n:o:d:" opt
+while getopts "p:n:d:t:" opt
 do
    case "$opt" in 
 	p) pipeline="$OPTARG" ;;
      	n ) project_name="$OPTARG" ;;
-      	o ) output_dir="$OPTARG" ;;
       	d ) download_arg="$OPTARG" ;;
+	t ) testing_arg="$OPTARG" ;;
       	? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
    esac
 done
 
 # Print helpFunction in case parameters are empty
-if [ -z "$pipeline" ] || [ -z $project_name ] || [ -z "$output_dir" ]; then
+if [ -z "$pipeline" ] || [ -z $project_name ]; then
    echo "Some or all of the parameters are empty";
    helpFunction
 fi
 
 check_initialization(){
-  if [[ ! -d $log_dir ]] || [[ ! -f "${log_dir}/gisaid_config.yaml" ]]; then
+  if [[ ! -d $log_dir ]] || [[ ! -f "${log_dir}/pipeline_config.yaml" ]]; then
     echo "ERROR: You must initalize the dir before beginning pipeline"
     exit 1
   fi
@@ -54,10 +59,10 @@ check_initialization(){
 # Config
 #############################################################################################
 #set args
-batch_limit=70
-date_stamp="$(date '+%Y%m%d')"
+if [ -z "$download_arg" ]; then download_arg="Y"; fi
 
 #remove trailing / on directories
+output_dir="../$project_name"
 output_dir=$(echo $output_dir | sed 's:/*$::')
 
 #set dirs
@@ -66,6 +71,7 @@ fastq_dir=$output_dir/fastq
 cecret_dir=$output_dir/cecret
 
 qc_dir=$output_dir/qc
+qcreport_dir=$qc_dir/covid19_qcreport
 
 tmp_dir=$output_dir/tmp
 fastqc_dir=$tmp_dir/fastqc
@@ -75,69 +81,101 @@ fasta_dir=$analysis_dir/fasta
 ivar_dir=$analysis_dir/ivar
 intermed_dir=$analysis_dir/intermed
 
-#make dirs
-##output
-if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
-
-##parent
-dir_list=(logs fastq cecret qc tmp analysis)
-for pd in "${dir_list[@]}"; do
-	if [[ ! -d $output_dir/$pd ]]; then mkdir -p $output_dir/$pd; fi
-done
-
-##qc
-#dir_list=(covid19_qcreport)
-#for pd in "${dir_list[@]}"; do
-#        if [[ ! -d $qc_dir/$pd ]]; then mkdir -p $qc_dir/$pd; fi
-#done
-
-#tmp
-dir_list=(fastqc unzipped)
-for pd in "${dir_list[@]}"; do
-        if [[ ! -d $tmp_dir/$pd ]]; then mkdir -p $tmp_dir/$pd; fi
-done
-
-#analysis
-dir_list=(fasta ivar intermed)
-for pd in "${dir_list[@]}"; do
-        if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi
-done
-
-#set configs
-cecret_config=config/22-02-11_cecret.config
-multiqc_config=config/multiqc_config.yaml
-
 #set files
 sample_id_file=$log_dir/sample_ids.txt
 pipeline_log=$log_dir/pipeline_log.txt
-final_results=$analysis_dir/final_results_$date_stamp.txt
-touch $pipeline_log
+
+#set configs
+multiqc_config="$log_dir/multiqc_config.yaml"
+pipeline_config="$log_dir/pipeline_config.yaml"
+cecret_config="22-02-23_cecret.config"
+
 
 #############################################################################################
 # Run CECRET
 #############################################################################################
-if [[ "pipeline" == "initialize" ]]; then
+if [[ "$pipeline" == "init" ]]; then
+	
+	echo
+	echo "*** INITIALIZING PIPELINE ***"
 
-  echo "*********Initializing pipeline*********"
+	#make directories, logs
+        if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
 
-  # copy config inputs to edit if doesn't exit
-  files_save=('../config/gisaid_config.yaml')
+        ##parent
+        dir_list=(logs fastq cecret qc tmp analysis)
+        for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/$pd ]]; then mkdir -p $output_dir/$pd; fi done
 
-  for f in ${files_save[@]}; do
-        IFS='/' read -r -a strarr <<< "$f"
-        if [[ ! -f "${log_dir}/${strarr[1]}" ]]; then \
-                cp $f "${log_dir}/${strarr[1]}"
-        else
-                echo "-Config already in output dir"
-        fi
-  done
+        ##qc
+        dir_list=(covid19_qcreport)
+        for pd in "${dir_list[@]}"; do if [[ ! -d $qc_dir/$pd ]]; then mkdir -p $qc_dir/$pd; fi done
 
-  #output complete
-  echo "-Config is ready to be edited:\n--${log_dir}/gisaid_config.yaml"
+        ##tmp
+        dir_list=(fastqc unzipped)
+        for pd in "${dir_list[@]}"; do if [[ ! -d $tmp_dir/$pd ]]; then mkdir -p $tmp_dir/$pd; fi done
+
+        ##analysis
+        dir_list=(fasta ivar intermed)
+        for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi done
+
+        ##make files
+        touch $pipeline_log
+
+	# copy config inputs to edit if doesn't exit
+	files_save=("config/pipeline_config.yaml" "config/$cecret_config" "config/multiqc_config.yaml")
+
+  	for f in ${files_save[@]}; do
+        	IFS='/' read -r -a strarr <<< "$f"
+        	if [[ ! -f "${log_dir}/${strarr[1]}" ]]; then
+                	cp $f "${log_dir}/${strarr[1]}"
+        	else
+			echo
+                	echo "Configs are already in output dir"
+			echo
+        	fi
+  	done
+
+	#output complete
+	echo
+  	echo -e "Configs are ready to be edited:\n${log_dir}"
+	echo
+	echo "*** INITIALIZATION COMPLETE ***"
+	echo
+
+elif [[ "$pipeline" == "update" ]]; then
+
+        #update the staphb toolkit
+        staphb-wf --auto_update
 
 elif [[ "$pipeline" == "run" ]]; then
 	
+	#set args
+	batch_limit=$(cat "${pipeline_config}" | grep "batch_limit: " | sed 's/batch_limit: //' | sed 's/"//g')
+	date_stamp=$(cat "${pipeline_config}" | grep "seq_date: " | sed 's/seq_date: //' | sed 's/"//g')
+	pangolin_version=$(cat "${pipeline_config}" | grep "pangolin_version: " | sed 's/pangolin_version: //' | sed 's/"//g')
+	final_results=$analysis_dir/final_results_$date_stamp.csv
+	
+	#check initialization was completed
+	check_initialization
+	
+	# specify version of panoglin in cecret config
+        sed -i "s/pangolin_container = 'staphb\/pangolin:latest'/pangolin_container = 'staphb\/pangolin:$pangolin_version'/" $log_dir/$cecret_config
+
 	#log
+	echo "------------------------------------------------------------------------" >> $pipeline_log
+	echo "*** CONFIG INFORMATION ***" >> $pipeline_log
+	echo "Sequence run date: $date_stamp" >> $pipeline_log
+	echo "Analysis date:" `date` >> $pipeline_log
+	echo "Cecret config: $cecret_config" >> $pipeline_log
+	echo "Pangolin version: $pangolin_version" >> $pipeline_log
+	cat "$log_dir/$cecret_config" | grep "params.reference_genome" >> $pipeline_log
+        cat "$log_dir/$cecret_config" | grep "params.gff_file" >> $pipeline_log
+        #cat "$log_dir/$cecret_config" | grep "params.primer_set" >> $pipeline_log
+        cat "$log_dir/$cecret_config" | grep "params.primer_bed" >> $pipeline_log
+        cat "$log_dir/$cecret_config" | grep "params.amplicon_bed" >> $pipeline_log
+        echo "------------------------------------------------------------------------" >> $pipeline_log
+
+	echo
 	echo "*** STARTING PIPELINE ***"
 	echo "*** STARTING PIPELINE ***" >> $pipeline_log
 	echo "Starting time: `date`" >> $pipeline_log
@@ -163,8 +201,8 @@ elif [[ "$pipeline" == "run" ]]; then
 	#############################################################################################
 	# Batching
 	#############################################################################################
-	#create sample_id file
-	ls $tmp_dir | cut -f1 -d "_" | grep "202[0-9]." > $sample_id_file
+	#create sample_id file - grab all files in dir, split by _, exclude OH- and noro- file names
+	ls $tmp_dir | cut -f1 -d "_" | grep "202[0-9]." | grep -v "OH.*" | grep -v "noro.*" > $sample_id_file
 
 	#read in text file with all project id's
 	IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file
@@ -204,10 +242,14 @@ elif [[ "$pipeline" == "run" ]]; then
 		fi
 	done
 
-        #log
+	# set testing parameter to only run 2 batches
+	if [[ "$testing_arg" = "Y" ]]; then batch_count=2; fi
+       
+	#log
+        # print number of lines in file without file name "<"
         sample_number=`wc -l < $sample_id_file`
-        echo "--A total of $sample_number's will be processed in $batch_count batches, with a maximum of $batch_limit per batch"
-        echo "--A total of $sample_number's will be processed in $batch_count batches, with a maximum of $batch_limit per batch" >> $pipeline_log
+        echo "--A total of $sample_number samples will be processed in $batch_count batches, with a maximum of $batch_limit per batch"
+        echo "--A total of $sample_number samples will be processed in $batch_count batches, with a maximum of $batch_limit per batch" >> $pipeline_log
 
 	#merge all batched outputs
         merged_samples=$log_dir/completed_samples.txt
@@ -233,10 +275,6 @@ elif [[ "$pipeline" == "run" ]]; then
 
 	#for each batch
 	for (( batch_id=1; batch_id<=$batch_count; batch_id++ )); do
-	#for (( batch_id=1; batch_id<=2; batch_id++ )); do
-	
-		echo "----Batch_$batch_id"
-		echo "----Batch_$batch_id" >> $pipeline_log
 	
 		#set manifest
 		batch_manifest=$log_dir/batch_0$batch_id.txt
@@ -250,16 +288,18 @@ elif [[ "$pipeline" == "run" ]]; then
 		#read text file
 		IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest
 
-		#echo if downloading
-                if [[ $download_arg == "Y" ]]; then echo "------downloading fastq files"; fi
+		#log
+		# print number of lines in file without file name "<"
+		n_samples=`wc -l < $batch_manifest`
+		echo "----Batch_$batch_id ($n_samples samples)"
+		echo "----Batch_$batch_id ($n_samples samples)" >> $pipeline_log
+
 
 		#run per sample
 		for sample_id in ${sample_list[@]}; do
 		
 			#download fastq files
-			if [[ $download_arg == "Y" ]]; then 
-				bs download biosample -n "$sample_id" -o $fastq_dir
-			fi
+			bs download biosample -n "$sample_id" -o $fastq_dir
 
         	        #make sample tmp_dir: tmp_dir/sample_id
 	                if [[ ! -d "$tmp_dir/${sample_id}" ]]; then mkdir $tmp_dir/${sample_id}; fi
@@ -285,8 +325,7 @@ elif [[ "$pipeline" == "run" ]]; then
 	        echo "-------Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 	
 		#run cecret
-		sudo cp $cecret_config $log_dir/cecret_config.config
-		staphb-wf cecret $fastq_batch_dir --reads_type paired --config $log_dir/cecret_config.config --output $cecret_batch_dir
+		staphb-wf cecret $fastq_batch_dir --reads_type paired --config $log_dir/$cecret_config --output $cecret_batch_dir
 
                 echo "-------Ending time: `date`" >> $pipeline_log
 		echo "-------Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
@@ -345,10 +384,7 @@ elif [[ "$pipeline" == "run" ]]; then
         	-c $log_dir/multiqc_config.yaml \
         	$fastqc_dir \
         	$tmp_dir/unzipped \
-        	-o $qc_dir
-
-	#re-organize qc
-	mv $qc_dir/multiqc_report.html $analysis_dir
+        	-o $qcreport_dir
 
 	#create final results file
 	final_nextclade=$intermed_dir/final_nextclade.txt
@@ -357,12 +393,12 @@ elif [[ "$pipeline" == "run" ]]; then
 	## remove duplicate headers
 	#from pangolin: sampleid, pangolin status, lineage
 	#from nextclade: sampleid, clade
-	cat $merged_nextclade | sort | uniq -u | awk -F';' '{print $1,$2}'| awk '{ gsub(/Consensus_/,"",$1) gsub(/\.consensus_[a-z0-9._]*/,"",$1); print }'| awk '{ print $1"\t"$2"_"$3 }' | awk '{ gsub(/"/,"",$2); print }' > $final_nextclade
+	cat $merged_nextclade | sort | uniq -u | awk -F';' '{print $1,$2}'| awk '{ gsub(/Consensus_/,"",$1) gsub(/\.consensus_[a-z0-9._]*/,"",$1); print }'| awk '{ print $1","$2"_"$3 }' | awk '{ gsub(/"/,"",$2); print }' > $final_nextclade
 	cat $merged_pangolin | sort | uniq -u |  awk -F',' '{print $1,$12,$2}'| awk '{ gsub(/Consensus_/,"",$1) gsub(/\.consensus_[a-z0-9._]*/,"",$1); print }' > $final_pangolin
 	
 	##pass to final results
 	echo "sample_id pangolin_status pangolin_lineage nextclade_clade" > $final_results
-	join <(sort $final_pangolin) <(sort $final_nextclade) >> $final_results
+	join <(sort $final_pangolin) <(sort $final_nextclade) -t $',' >> $final_results
 
 	echo "---Ending time: `date`" >> $pipeline_log
 
@@ -371,10 +407,8 @@ elif [[ "$pipeline" == "run" ]]; then
 	
 	#remove all proj files
 	rm -r --force $tmp_dir
-	rm -r --force $cecret_dir
-	rm -r --force $qc_dir
-	rm -r --force $fastq_dir
-	
+	rm -r --force $cecret
+
         #############################################################################################
 	# Run GISAID UPLOAD
 	#############################################################################################
@@ -382,12 +416,12 @@ elif [[ "$pipeline" == "run" ]]; then
 	#bash gisaid.sh "${log_dir}" "${fasta_dir}"
 	#"${log_dir}"/${date_stamp}_${project_id}_metadata.csv 2> "${log_dir}"/gisaid_warnings.txt
 
-
-
 	#log
-	echo "***COMPLETED PIPELINE"
+	echo "*** PIPELINE COMPLETE ***"
 	echo "Ending time: `date`" >> $pipeline_log
 	echo "Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
-	echo "***COMPLETED PIPELINE" >> $pipeline_log
+	echo "*** PIPELINE COMPLETE ***" >> $pipeline_log
+else
+	echo "Pipeline options (-p) must be run, init or update"
 fi
 
