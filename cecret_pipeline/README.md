@@ -1,14 +1,11 @@
 # ODH-COVID19
-Ohio COVID-19 analysis workflow
-
 Welcome to the ODH-COVID19 Analysis workflow SOP!
 
 ## Getting Started
 Deployment of the workflow requires access to the AWS instance where the `staphb-wf cecret` workflow is stored.
-The GISAID upload repository is stored locally, and will be used for project deployment. Multiple projects can be deployed from this one point simultaneously, without concern.
 1. Change working directory to the ODH-COVID19 repository
 > ```
-> cd /l/Micro/Gen Micro/Whole Genome Sequencing/Coronavirus_WGS/COVID-19 Fastas/GITHUB/ODH-COVID19-main/gisaid_upload
+> cd analysis_workflow
 > ```
 
 2. Review the tutorial information below.
@@ -16,41 +13,39 @@ The GISAID upload repository is stored locally, and will be used for project dep
 ## Pipeline Options
 The workflow has a multiple options:
 > ```bash
-> sh run_gisaid.sh
+> bash run_cecret.sh
 > Usage: -p pipeline
-> 	-p options: initialize, batch, error
-> Usage:  -o output_dir
-> 	-o path to output directory
+> 	-p options: init, run, gisaid, update
+> Usage:  -n name of the project
+> 	-n for example OH-VH00123-2201234
 > ```
 
 Example commands:
 > ```bash
 > #Initialize Pipeline
-> sh run_gisaid.sh -p initialize -o /path/to/output/dir
+> bash run_cecret.sh -p init -n OH-VH00123-2201234
 > 
-> #Execute batch creation
-> sh run_gisaid.sh -p batch -o /path/to/output/dir
+> #Execute CECRET, QC workflow
+> bash run_cecret.sh -p run -n OH-VH00123-2201234
 > 
-> #Execute error run
-> sh run_gisaid.sh -p error -o /path/to/output/dir
+> #Execute GISAID workflow
+> bash run_cecret.sh -p gisaid -n OH-VH00123-2201234
+> 
+> #Execute update of workflow features
+> bash run_cecret.sh -p update
 > ```
 
-Explanation of pre-processing step:
-- initialize (required): This must be performed before any pipeline execution (run or error) can be performed. This will copy the necessary config files needed to run the pipeline to the provided output directory.
+Explanation of pre-processing:
+- initialize (required): This must be performed before any pipeline execution (-p run) can be performed. This will copy the necessary config files needed to run the pipeline to the provided output directory.
 
 Explanation of processing steps:
-- batch - This will run the batch pipeline, on a local terminal, for a GISAID batched upload.
+- run - This will run the cecret pipeline, on a local terminal, as well as the QC report.
+- gisaid - This will run the GISAID upload of samples, assign EPI ID's and determine errors.
 
 Explanation of other steps:
-- error - This will run the pipeline, on a local terminal, processing GISAID errors.
+- update - This will run a pipeline update, on a local terminal, updating the cecret features.
 
 ## Complete Pipeline Workflow
-* Project Tracking *
-1. Open tracking document
-2. Input number of samples to be processed in column C
-3. Run "initialize" pipeline; edit /output/dir/gisaid_config.yaml with project name
-4. Run "batch" pipeline
-
 * Workflow of Pipeline *
 1. Creates list of files within project directory to be reviewed
 2. Perform QC for samples that fail N threshold, files added to failed list
@@ -103,7 +98,7 @@ There is one config requirement for this pipeline, found /output/dir/gisaid_conf
 ## Preparing Directory folder
 The pipeline assumes that the directory structure for input is as follows:
 project_name
-- Fastas - GISAID Not Complete
+- Fastas_not_complete
   - fasta1_consensus.fasta
   - fasta2_consensus.fasta
   - fasta3_consensus.fasta
@@ -133,7 +128,7 @@ This file includes sample and QC information for all failed samples, either prov
 /Users/sevillas2/Desktop/APHL/test_data/OH-123/seq3.fasta 	 53% N
 /Users/sevillas2/Desktop/APHL/test_data/OH-123/seq4.fasta 	 53% N
 ```
-#### Example qc_pasied.txt
+#### Example qc_passed.txt
 This file will include sample information that has been added to metadata file, and that has fasta file data merged 
 ```
 >something/goes/here_SC1234/2020/seq1.fasta
