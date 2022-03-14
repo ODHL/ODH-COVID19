@@ -12,7 +12,9 @@ The workflow design is as follows:
 - run GISAID upload
 
 ## Usage
-### Help
+### Get Help
+```
+> bash run_analysis_pipeline.sh --help
 Usage:  -p pipeline options
 -e      -p options: init, run, gisaid, update
 Usage:  -n project_name
@@ -21,6 +23,7 @@ Usage:  -q qc_flag
 -e      -q Y flag of whether to run QC analysis on files
 Usage:  -t testing_flag
 -e      -t Y flag indicate if run is a test
+```
 
 ### Initialization (REQUIRED)
 Deployment of either run feature (CECRET or GISAID) requires the initalization of the pipeline. This step will create the directory structure needed for the pipeline, will create log files for documentation and will copy the necessary manifests and config files to their appropriate locations for pipeline control.
@@ -35,7 +38,7 @@ cd analysis_pipeline
 bash run_analysis_pipeline.sh -p init -n name_of_project -q Y
 
 ```
-
+```
 Expected output:
 -- /name_of_project/
 ---- /analysis/
@@ -55,7 +58,7 @@ Expected output:
 ------ /tmp/
 -------- fastqc
 -------- unzipped
-
+```
 ### Update Configuration Files (REQUIRED)
 After completion of the initialization step, configuration files must be edited according to the project. These include:
 
@@ -69,30 +72,30 @@ After completion of the initialization step, configuration files must be edited 
   1. date_of_creation_cecret.config
   2. date_of_creation_cecret_partial.config
 
-If a QC report is not required (-q N), the partial configuration (#2) is used. This will only run a subset of the entire CECRET pipeline, increasing the pipeline speed and decreasing overall disc space required. 
+- If a QC report is not required (-q N), the partial configuration (2.) is used. This will only run a subset of the entire CECRET pipeline, increasing the pipeline speed and decreasing overall disc space required. 
 - Location: /name_of_project/logs/date_of_creation_cecret.config or /name_of_project/logs/date_of_creation_cecret_partial.config
 
 #### 3. MultiQC Config
--  Description: THis configuration file controls all the features associated with the MultiQC report generated upon pipeline completion (-q Y). Editing this configuration file is not recomended outside of pipeline maintainence (see below).
+-  Description: THis configuration file controls all the features associated with the MultiQC report generated upon pipeline completion (`-q Y`). Editing this configuration file is not recomended outside of pipeline maintainence (see below).
 - Location: /name_of_project/logs/multiqc_config.yaml
 
 ### Running CECRET workflow (REQUIRED)
 This wrapper performs the following steps:
-- downlaods the required files for processing complete project (file type dependent on whether QC report is to be downloaded) directly from BaseSpace
+- downloads the required files for processing complete project (file type dependent on whether QC report is to be downloaded) directly from BaseSpace
 - creates sample batches dependent on project size and input from pipeline_config.yaml (batch_limit)
 - processes batches individually, performing a clean-up of intermediate files to ensure disc space of AWS instance is most effeciently utilized
--- downloads sample fastq files directly from BaseSpace
--- (if QC report required) process analysis files
--- submits batch to `staphb-wf cecret` workflow
--- (if QC report required) process output QC data from cecret workflow
--- (if QC report required) generates QC report from CECRET and BaseSpace output
--- generates combined PANGOLIN and NEXTCLAD final analysis report
--- removes intermediate files, and working directories
+  - downloads sample fastq files directly from BaseSpace
+  - (if QC report required) process analysis files
+  - submits batch to `staphb-wf cecret` workflow
+  - (if QC report required) process output QC data from cecret workflow
+  - (if QC report required) generates QC report from CECRET and BaseSpace output
+  - generates combined PANGOLIN and NEXTCLAD final analysis report
+  - removes intermediate files, and working directories
 
 0. Ensure initialization has been complete
 0. Ensure configuration files have been updated
 1. Change working directory to the analysis pipeline directory
-2. Select the run flag (-p run) on the project (-n name_of_project) and select whether a QC report (-q) should be generated (Y or N)
+2. Select the run flag (`-p run`) on the project (`-n name_of_project`) and select whether a QC report (`-q`) should be generated (`Y` or `N`)
 
 ```
 # 1. move to working dir
