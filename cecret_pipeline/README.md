@@ -1,108 +1,118 @@
 # ODH-COVID19
 
 ## Getting Started
-A bash wrapper designed to incoporate the `staphb-wf cecret` workflow, generation of QC reports, and uploading of samples to GISAID via `gisaid cli` into one analysis pipeline.
-
-## Pipeline Overview
-Deployment of the workflow requires access to the AWS instance where the `staphb-wf cecret` workflow is stored. The workflow also deploys `gisaid cli`, where a version has been installed and maintained on the AWS instance.
-
-The workflow design is as follows:
-- initialize pipeline
-- run CECRET workflow and generate QC report
-- run GISAID upload
+An analysis pipeline designed to incoporate the `staphb-wf cecret` workflow, generation of QC reports, downloading of raw data and analysis files via `basespace cli`, uploading of samples to GISAID via `gisaid cli` and upload of samples to NBCI `ncbi cli` into one workflow.
 
 ## Usage
+The pipeline workflow is as follows:
+- [initialize pipeline](https://github.com/slsevilla/ODH-COVID19/blob/main/cecret_pipeline/README.md#initialization)
+- [run CECRET workflow](https://github.com/slsevilla/ODH-COVID19/blob/main/cecret_pipeline/README.md#running-cecret-workflow)
+- [run GISAID upload](https://github.com/slsevilla/ODH-COVID19/blob/main/cecret_pipeline/README.md#running-gisaid-workflow) (IN PROGRESS)
+- run NCBI upload (IN PROGRESS)
+
+## Pipeline Overview
+Deployment of the pipeline requires access to the AWS instance where features are stored, including `staphb-wf cecret`, `basespace cli`, `gisaid cli` and `ncbi cli`. 
+
+This pipeline performs the following steps:
+* INITIALIZE *
+
+* RUN *
+1. downloads analysis files for processing directly from BASESPACE
+2. creates sample batches dependent on project size and input from config_pipeline.yaml
+3. processes batches individually, including:
+3a. (if QC report required) downloads and processes BASESPACE analysis files
+3b. downloads sample fastq files directly from BaseSpace
+3c. submits batch to `staphb-wf cecret` workflow
+3d. (if QC report required) process output QC data from CECRET and BASESPACE
+3e. generates combined PANGOLIN and NEXTCLAD final analysis report
+4. removes intermediate files, and working directories
+
+* GISAID *
+1. Perform QC for samples that fail N threshold, files added to failed list
+2. Perform QC for samples missing metadata files, files added to failed list
+3. All samples passing QC have metadata added to GISAID batch upload template, FASTA files are added to merged FASTA file
+4. Samples are uploaded to GISAID
+5. Return sample ID's are added to final output, QC information is tracked
+
 ### Help
-Usage:  -p pipeline options
--e      -p options: init, run, gisaid, update
+Usage:  -r run options
+-e      -r options: init, run, gisaid, ncbi, update
 Usage:  -n project_name
 -e      -n project name
 Usage:  -q qc_flag
--e      -q Y flag of whether to run QC analysis on files
+-e      -q option to run QC analysis (default "Y")
 Usage:  -t testing_flag
--e      -t Y flag indicate if run is a test
+-e      -t option to run test parameters (default "N")
+Usage:  -p partial_flag
+-e      -p option to run partial run parameters (default "N")
 
-### Initialization (REQUIRED)
-Deployment of either run feature (CECRET or GISAID) requires the initalization of the pipeline. This step will create the directory structure needed for the pipeline, will create log files for documentation and will copy the necessary manifests and config files to their appropriate locations for pipeline control.
+### Initialization
+Deployment of run features (CECRET, GISAID, NCBI) requires the initalization of the pipeline. This step will create the directory structure needed for the pipeline, will create log files for documentation and will copy the necessary manifests and config files to their appropriate locations for pipeline control.
 
 1. Change working directory to the analysis pipeline directory
-2. Select the initialization flag (-p init) on the project (-n name_of_project) and select whether a QC report (-q) should be generated (Y or N)
+2. Select the initialization flag (-r init) on the project (-n name_of_project)
 
 ```
 
 cd analysis_pipeline
 
-bash run_analysis_pipeline.sh -p init -n name_of_project -q Y
+bash run_analysis_pipeline.sh -r init -n name_of_project
 
 ```
 
-Expected output:
+Initialization output:
 -- /name_of_project/
 ---- /analysis/
 ------ /fasta/
+-------- /not_uploaded/
+-------- /uploaded/
+-------- /partial_upload/
+-------- /failed/
 ------ /intermed/
------- /ivar/
 ---- /cecret/
 ---- /fastq/
 ---- /logs/
------- 22-02-23_cecret.config
--------- gisaid_log.txt
--------- multiqc_config.yaml
--------- pipeline_config.yaml
--------- pipeline_log.txt
+------ config_cecret.config
+------ config_multiqc.yaml
+------ config_pipeline.yaml
+------ gisaid_log.txt
+------ pipeline_log.txt
 ------ /qc/
 -------- covid19_qcreport
 ------ /tmp/
 -------- fastqc
 -------- unzipped
 
-### Update Configuration Files (REQUIRED)
-After completion of the initialization step, configuration files must be edited according to the project. These include:
+### Configuration Files
+After completion of the initialization step, configuration files may be edited according to the project. These include:
 
-#### 1. Pipeline Config
-- Description: This configuration file controls all metadata associated with the project, as well as pipeline specific parameters. Within this configuration file PANGOLIN software versions can be selected, final results file name can be updated, and batch size can be controlled. GISAID-related parameters (optional and required) are also included in this configuration file.
-- Location: /name_of_project/logs/pipeline_conifg.yaml
+#### 1. PIPELINE Config
+- Description: This configuration file controls all metadata associated with the project, as well as pipeline specific parameters. Within this configuration file software versions can be selected and batch size can be controlled. GISAID-related parameters (optional and required) are also included in this configuration file.
+- Location: /name_of_project/logs/config_pipeline.yaml
 
 #### 2. CECRET Config
-- Description: This configuration file controls all the features associated with the CECRET pipline (see below for pipeline maintainence). Editing this configuration file is not recommended outside of pipeline maintenance (see below). Two versions of the configuration file are in use:
+- Description: This configuration file controls all the features associated with the CECRET workflow.
+- Location: /name_of_project/logs/config_cecret.config
 
-  1. date_of_creation_cecret.config
-  2. date_of_creation_cecret_partial.config
+#### 3. MULTIQC Config
+-  Description: This configuration file controls all the features associated with the MULTIQC report generated upon pipeline completion.
+- Location: /name_of_project/logs/config_multiqc.yaml
 
-If a QC report is not required (-q N), the partial configuration (#2) is used. This will only run a subset of the entire CECRET pipeline, increasing the pipeline speed and decreasing overall disc space required. 
-- Location: /name_of_project/logs/date_of_creation_cecret.config or /name_of_project/logs/date_of_creation_cecret_partial.config
-
-#### 3. MultiQC Config
--  Description: THis configuration file controls all the features associated with the MultiQC report generated upon pipeline completion (-q Y). Editing this configuration file is not recomended outside of pipeline maintainence (see below).
-- Location: /name_of_project/logs/multiqc_config.yaml
-
-### Running CECRET workflow (REQUIRED)
-This wrapper performs the following steps:
-- downlaods the required files for processing complete project (file type dependent on whether QC report is to be downloaded) directly from BaseSpace
-- creates sample batches dependent on project size and input from pipeline_config.yaml (batch_limit)
-- processes batches individually, performing a clean-up of intermediate files to ensure disc space of AWS instance is most effeciently utilized
--- downloads sample fastq files directly from BaseSpace
--- (if QC report required) process analysis files
--- submits batch to `staphb-wf cecret` workflow
--- (if QC report required) process output QC data from cecret workflow
--- (if QC report required) generates QC report from CECRET and BaseSpace output
--- generates combined PANGOLIN and NEXTCLAD final analysis report
--- removes intermediate files, and working directories
+### Running CECRET workflow
 
 0. Ensure initialization has been complete
-0. Ensure configuration files have been updated
 1. Change working directory to the analysis pipeline directory
-2. Select the run flag (-p run) on the project (-n name_of_project) and select whether a QC report (-q) should be generated (Y or N)
+2. Select the run flag (-r run) on the project (-n name_of_project). (OPTIONAL) select whether a QC report (-q) should be generated (default "Y")
 
 ```
 # 1. move to working dir
 cd analysis_pipeline
 
 # 2A. run with QC report
-bash run_analysis_pipeline.sh -p run -n name_of_project -q Y
+bash run_analysis_pipeline.sh -r run -n name_of_project -q Y
 
 # 2B. run without QC report
-bash run_analysis_pipeline.sh -p run -n name_of_project -q N
+bash run_analysis_pipeline.sh -R run -n name_of_project -q N
 
 ```
 
@@ -116,144 +126,103 @@ bash run_analysis_pipeline.sh -p gisaid -n name_of_project
 ```
 
 ## Tutorial
-Testing parameters have been created in order to test the settings of the pipeline with new data, or train new staff on it's usage. Test settings will download a complete project, but
-will only run two batches, with two samples in each batch. Initialization, run, and QC parameters should be reviewed below as they may be used in conjunction with the test setting.
+Testing parameters have been created in order to test the settings of the pipeline with new data, or train new staff on it's usage. Test settings will download a complete project, but will only run two batches, with two samples in each batch. Initialization, run, and QC parameters should be reviewed below as they may be used in conjunction with the test setting.
 
 1. Change working directory to the analysis pipeline directory
-2. Run test on project name_of_project with the testing (-t) flag turned on (Y) and qc flag (-q) off (N)
+2. Run test on project name_of_project with the testing (-t) flag turned on (Y).(OPTIONAL) select whether a QC report (-q) should be generated (default "Y")
 
 ```
 # 1. move to working dir
 cd analysis_pipeline
 
 # 2. run with testing flag on, without QC report
-bash run_analysis_pipeline.sh -p test -n name_of_project -t Y -q N
+bash run_analysis_pipeline.sh -r test -n name_of_project -t Y -q N
 ```
 
-## TO DO: everything below
+## Configuration Files
+- Required:
+   - Submitter: enter your GISAID-Username
+   - Type: default must remain betacoronavirus
+   - Passage details/history: Original, Vero
+   - Host: Human, Environment, Canine, Manis javanica, Rhinolophus affinis, etc 
+   - Gender: set to unkonwn for all
+   - Patient status: Hospitalized, Released, Live, Deceased, or unknown
+   - Outbreak: Date, Location, type of gathering (Family cluster, etc.)
+   - Last vaccinated: provide details if applicable
+   - Treatment: Include drug name, dosage
+   - Sequencing technology: Illumina Miseq, Sanger, Nanopore MinION, Ion Torrent, etc.
+   - Originating lab: Where sequence data have been generated
+   - Address: Address of originating lab
+   - Submitting lab: Where sequence data is being submitted to GISAID
+   - Address: Address of submitting lab
+   - Authors: a comma separated list of Authors with complete First followed by Last Name
+- Optional:
+   - Additional location information: Cruise Ship, Convention, Live animal market
+   - Additional host information: Patient infected while traveling in …. 
+   - Sampling Strategy: Sentinel surveillance (ILI), Sentinel surveillance (ARI), Sentinel surveillance (SARI), Non-sentinel-surveillance (hospital), Non-sentinel-surveillance (GP network), Longitudinal sampling on same patient(s), S gene dropout
+   - Specimen source: Sputum, Alveolar lavage fluid, Oro-pharyngeal swab, Blood, Tracheal swab, Urine, Stool, Cloakal swab, Organ, Feces, Other
+   - Assembly method: CLC Genomics Workbench 12, Geneious 10.2.4, SPAdes/MEGAHIT v1.2.9, UGENE v. 33, etc.
+   - Coverage: 70x, 1,000x, 10,000x (average)
+ 
+## Software
+### GISAID specific features
+GISAID CLI requires authentication. Authentication must be performed every 100 days. 
+
+To run tests, use client_id:
+--client_id: TEST-EA76875B00C3
+
+For sample uploads, use client_id obtained by emailing:
+--email: clisupport@gisaid.org
+
+User specific ID list
+--cliend_id: cid-1e895d886d3a6
+
+```
+# Example test authentication
+cli2 authenticate --client_id TEST-EA76875B00C3 --username sevillas2
+
+# Example full authentication
+cli2 authenticate --cliend_id [insert id] --username [username]
+```
+ 
 ## Pipeline Maintanence
+### Configuration Files
+#### Active Configs. All configuration files should adopt a standard nomenclature: config_typeofconfig.yaml. For example, config_pipeline.yaml for a pipeline config file. Accepted typeofconifg are: pipeline,cecret,multiqc.
+#### In-active Configs. Any updated configuration files should follow archiving practices described below.
+
+### Reference Files
+#### Active References. All references files should adopt a standard nomenclature: ref_typeofref_id.yaml. For example, config_pipeline.yaml for a pipeline config file. Accepted typeofconifg are: pipeline,cecret,multiqc.
+#### In-active Configs. Any updated configuration files should follow archiving practices described below.
+
+### Archiving
+Supporting Files. All configuration and reference files should be kept for documentation purposes. The outdated file should be copied with the naming schema: config_typeofconfig_dateofarchive.ext or reference_referencetype_dateofarchive.ext. Reference file README must be updated to indicate the new source of the reference file in use. All changes must be backed up on GITHUB within one week.
+
+### Once it is determined that the pipeline is needed to be updated (either configuration files, reference files) changes should be made to the local repository. GITHUB must be updated with these changes and a new version should be tagged. If changes are backwards compatible a minor version change can be implemented. If the change is not backwards compatible, then a major version change should be implemented.
+
+### Software Updates 
+#### CECRET
+The CECRET pipeline can be updated through the analysis workflow. This will update the pipeline and any related script/pipeline/docker changes. This would not constitute an archiving event.
+
+```
+cd analysis_pipeline
+
+bash run_analysis_pipeline.sh -p update
+```
+
+#### PANGOLIN, NEXTCLADE
+New versions of PANGOLIN and NEXTCLADE have a significant impact on the results generated from the analysis workflow. While these should be regularly reviewed, updating these will require a change to the config and to the workflow run file (run_analysis_pipeline.sh). Follow the nomenclature, documentation, and archiving strategies described under configuration updates. This would consistitute a minor archiving event.
+
+1. Update configuration file
+	- Updates must be made to the configuration file to provide users with the newest version
+2. Update analysis run_file
+	- Updates must be to the run_analysis_pipeline.sh to conver the user selected feature to the correct software version.
+TODO: create a file that can be edited rather than needed to edit the run_analysis_pipeline.sh
+
 ### Reference files
 - include information on archiving
 - where source documentation is
 https://github.com/artic-network/artic-ncov2019/tree/master/primer_schemes/nCoV-2019/V4.1
+This would constitute a minor archiving event.
 
-### configuration updates
-- include how to download cecret config
-- include information on archiving
-- include information on pipeline partial features
-- include multiqc reference link for updating
-- when GISAID is completed - anything needed for this
-
-### updating features
-- how to update CECRET (-p update)
-- figure out how to update gisaid - maybe add to update flag above
-- how to update pangolin version (needs to be done in config and in run_pipeline file (add numerics, name must match docker, add link)
-
-## TO DO: Incorporate GISAID notes below when complete
-1. Open tracking document
-2. Input number of samples to be processed in column C
-3. Run "initialize" pipeline; edit /output/dir/gisaid_config.yaml with project name
-4. Run "batch" pipeline
-
-* Workflow of Pipeline *
-1. Creates list of files within project directory to be reviewed
-2. Perform QC for samples that fail N threshold, files added to failed list
-3. Perform QC for samples missing metadata files, files added to failed list
-4. All samples passing QC have metadata added to GISAID batch upload template, file names are added to pass list
-5. All samples passing QC are added to merged FASTA file
-
-* GISAID Upload *
-1. Document N samples passing QC and N samples failing in tracking file, columns D and E
-2. Open batched_metadata_input.csv file
-3. Open timestamp_ProjectName_metadata.xls file
-4. Paste batched_metadata_input.csv into second tab of DATE_ProjectName_metadata.xls
-5. Fix date error with excel conversion 
-6. Upload to timestamp_ProjectName_metadata.xls and batched_merged_fasta.fasta files to GISAID batch uploader
-
-* GISAID Error *
-1. Download the timestamp_ProjectName_metadata.xls file with notes from GISAID
-2. Copy virus name and error notes columns to /ProjectName/fastas_GISAID_errors/error_log.txt
-3. Document N samples passing QC and N samples failing in tracking file, columns F and G
-4. Run "error" pipeline
-
-## Preparing Config
-There is one config requirement for this pipeline, found /output/dir/gisaid_config.txt, after initialization. 
-- Update the config file, as necessary, following the format below:
-  - Required:
-    - Submitter: enter your GISAID-Username
-    - Type: default must remain betacoronavirus
-    - Passage details/history: Original, Vero
-    - Host: Human, Environment, Canine, Manis javanica, Rhinolophus affinis, etc 
-    - Gender: set to unkonwn for all
-    - Patient status: Hospitalized, Released, Live, Deceased, or unknown
-    - Outbreak: Date, Location, type of gathering (Family cluster, etc.)
-    - Last vaccinated: provide details if applicable
-    - Treatment: Include drug name, dosage
-    - Sequencing technology: Illumina Miseq, Sanger, Nanopore MinION, Ion Torrent, etc.
-    - Originating lab: Where sequence data have been generated and submitted to GISAID
-    - Address
-    - Submitting lab
-    - Address
-    - Authors: a comma separated list of Authors with complete First followed by Last Name
-
-  - Optional:
-    - Additional location information: Cruise Ship, Convention, Live animal market
-    - Additional host information: Patient infected while traveling in …. 
-    - Sampling Strategy: Sentinel surveillance (ILI), Sentinel surveillance (ARI), Sentinel surveillance (SARI), Non-sentinel-surveillance (hospital), Non-sentinel-surveillance (GP network), Longitudinal sampling on same patient(s), S gene dropout
-    - Specimen source: Sputum, Alveolar lavage fluid, Oro-pharyngeal swab, Blood, Tracheal swab, Urine, Stool, Cloakal swab, Organ, Feces, Other
-    - Assembly method: CLC Genomics Workbench 12, Geneious 10.2.4, SPAdes/MEGAHIT v1.2.9, UGENE v. 33, etc.
-    - Coverage: 70x, 1,000x, 10,000x (average)
-
-## Preparing Directory folder
-The pipeline assumes that the directory structure for input is as follows:
-project_name
-- Fastas - GISAID Not Complete
-  - fasta1_consensus.fasta
-  - fasta2_consensus.fasta
-  - fasta3_consensus.fasta
-  
-## Expected Outputs
-- project_dir
-  - Fastas - GISAID Not Complete
-    - fasta1.fasta
-    - error_log.txt
-  - fastas_GISAID_errors
-  - fastas_GISAID_uploaded
-  - GISAID_logs
-    - timestamp
-      - qc_passed.txt
-      - qc_failed.txt
-      - batched_metadata_input.csv
-      - batched_fasta_input.fasta
-      - project_name_metadata.xls
-  - gisaid_config.yaml
-    
-#### Example qc_failed.txt
-This file includes sample and QC information for all failed samples, either providing note on missing metadata or on N values above threshold
-```
-#filename, reason for failure
-/Users/sevillas2/Desktop/APHL/test_data/OH-123/2021063918_consensus.fasta	Missing metadata
-/Users/sevillas2/Desktop/APHL/test_data/OH-123/seq2.fasta	Missing metadata
-/Users/sevillas2/Desktop/APHL/test_data/OH-123/seq3.fasta 	 53% N
-/Users/sevillas2/Desktop/APHL/test_data/OH-123/seq4.fasta 	 53% N
-```
-#### Example qc_pasied.txt
-This file will include sample information that has been added to metadata file, and that has fasta file data merged 
-```
->something/goes/here_SC1234/2020/seq1.fasta
->something/goes/here_SC5678/2021/seq2.fasta
-```
-
-
-## GISAID CLI notes
-### Authenticate 
-To run tests, use client_id:
---client_id: TEST-EA76875B00C3
-
-For sample uploads, use client_id:
-
-
-```
-#Example
-cli2 authenticate --client_id TEST-EA76875B00C3 --username sevillas2
-```
+### Primers
+TODO update which primers are used. This would consistitute a minor archiving event.
