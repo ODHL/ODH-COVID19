@@ -1,299 +1,294 @@
-
 #########################################################
 # ARGS
 #########################################################
-fasta_dir=$1
+output_dir=$1
 project_id=$2
 pipeline_config=$3
-metadata_loc=$4
+final_results=$4
+reject_flag=$5
 #########################################################
 # functions
 #########################################################
-config_format() {
-    input_variable="'$*'"
-
-    if [[ "$input_variable" == "''" ]]; then
-        input_variable=","
-    else
-        #convert spaces to - so that single variables are not split into multiple columns
-        input_variable=`echo $input_variable | awk '{ gsub(" ", "-") ; print $0 }'`
-        input_variable=`echo $input_variable | awk '{ gsub(",", "\,") ; print $0 }'`
-    fi
+parse_yaml() {
+   local prefix=$2
+   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+   sed -ne "s|^\($s\)\($w\)$s:$s\"\(.*\)\"$s\$|\1$fs\2$fs\3|p" \
+        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
+   awk -F$fs '{
+      indent = length($1)/2;
+      vname[indent] = $2;
+      for (i in vname) {if (i > indent) {delete vname[i]}}
+      if (length($3) > 0) {
+         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
+      }
+   }'
 }
 
-metadata_output() {
-    input_array=("$@")
-    array_echo=""
-
-    #for each element of array, bind with "," and print to output
-    for h in ${input_array[@]}; do
-        if [ "$array_echo" == "" ]; then #if its the first item, pass variable
-            array_echo=`echo "${h}"`
-        elif [ "$h" == "," ]; then #if its a , then append TODO not sure if needed in linux
-            array_echo=`echo "${array_echo}${h}"`
-        else #otherwise add a comma before appending next variable
-            array_echo=`echo "${array_echo},${h}"`
-        fi
-    done
-
-    #fix temporary substitutions
-    #array_output=`echo $array_echo | awk '{ gsub("-", " ") ; print $0 }'` #corrects header
-    #array_output=`echo $array_output | awk '{ gsub("'\''", "") ; print $0 }'` #corrects authors
-    #array_output=`echo $array_output | awk '{ gsub("*", "-") ; print $0 }'` #corrects virus name
-
-    #output to metadata file
-    echo $array_output >> $batched_meta
-}
 
 #########################################################
 # Set dirs, files, args
 #########################################################
-#set args
-config_percent_n=$(cat "${pipeline_config}" | grep "percent_n: " | sed 's/percent_n: //' | sed 's/"//g')
-date_stamp=`date+%Y%M%D`
+# read in config
+eval $(parse_yaml ${pipeline_config} "config_")
 
-#set dirs
-fasta_not=$fasta_dir/gisaid_not_uploaded
-fasta_uploaded=$fasta_dir/gisaid_uploaded
-fasta_log=$fasta_dir/gisaid_logs
+# set date
+date_stamp=`date '+%Y_%m_%d'`
 
-#create files to track changes
-failed_list="$fasta_log/qc_failed.txt"
-passed_list="$fasta_log/qc_passed.txt"
+# set dirs
+fasta_notuploaded=$output_dir/analysis/fasta/not_uploaded
+fasta_uploaded=$output_dir/analysis/fasta/upload_partial
+fasta_failed=$output_dir/analysis/fasta/upload_failed
+log_dir=$output_dir/logs
 
-#set files for upload
-FASTA_filename="batched_fasta_input.fasta"
-batched_fasta="$fasta_uploaded/$FASTA_filename"
-meta_filename="batched_meta_${date_stamp}_${project_id}.csv"
-batched_meta="$gisaid_dir/$meta_filename"
+# set files
+gisaid_log="$log_dir/gisaid_log_${project_id}_${date_stamp}.txt"
+gisaid_failed="$log_dir/gisaid_failed_${project_id}_${date_stamp}.txt"
+gisaid_results="$output_dir/analysis/intermed/gisaid_results.csv"
+gisaid_rejected="$output_dir/analysis/intermed/gisaid_rejected.csv"
 
-#TODO is this needed
-failed_compiled="$fasta_not/qc_failed.txt"
+FASTA_filename="batched_fasta_${project_id}_${date_stamp}.fasta"
+batched_fasta="$log_dir/$FASTA_filename"
 
-touch "${failed_list}"
-touch "${passed_list}"
-touch "${batched_fasta}"
-touch "${batched_meta}"
+meta_filename="batched_meta_${project_id}_${date_stamp}.csv"
+batched_meta="$log_dir/$meta_filename"
+
+# set gisaid ID
+gisaid_auth="${config_gisaid_auth}"
 
 #########################################################
 # Controls
 #########################################################
-pipe_prep="Y"
-pipe_upload="N"
+# to run cleanup of frameshift samples, pass frameshift_flag
+if [[ $reject_flag == "N" ]]; then
+	pipeline_prep="Y"
+	pipeline_upload="Y"
+	pipeline_qc="Y"
+	pipeline_rejected="N"
+else
+	pipeline_prep="N"
+	pipeline_upload="N"
+	pipeline_qc="N"
+	pipeline_rejected="Y"
+fi
 
 #########################################################
 # Code
 #########################################################
-if [[ "$pipe_prep" == "Y" ]]; then
-    
-	# Create manifest for upload
-    ## set headers; echo to metadata_input
-    header_1=("submitter" "fn" "covv_virus_name" "covv_type" "covv_passage" "covv_collection_date" "covv_location" "covv_add_location" \
-    "covv_host" "covv_add_host_info" "covv_sampling_strategy" "covv_gender" "covv_patient_age" "covv_patient_status" "covv_specimen" \
-    "covv_outbreak" "covv_last_vaccinated" "covv_treatment" "covv_seq_technology" "covv_assembly_method" "covv_coverage" "covv_orig_lab" \
-    "covv_orig_lab_addr" "covv_provider_sample_id" "covv_subm_lab" "covv_subm_lab_addr" "covv_subm_sample_id" "covv_authors" "covv_comment" "comment_type")
-    metadata_output "${header_1[@]}"
+if [[ "$pipeline_prep" == "Y" ]]; then
+        echo "----PREPARING FILES"
+	# create files
+        if [[ -f $batched_meta ]]; then rm $batched_meta; fi
+        if [[ -f $gisaid_results ]]; then rm $gisaid_results; fi
+        if [[ -f $batched_fasta ]]; then rm $batched_fasta; fi
+	touch $batched_fasta
+	touch $gisaid_results
+	touch $gisaid_log
 
-    header_2=("Submitter" "FASTA filename" "Virus name" "Type" "Passage details/history" "Collection date" "Location" \
-    "Additional location information" "Host" "Additional host information" "Sampling Strategy" "Gender" "Patient age" \
-    "Patient status" "Specimen source" "Outbreak" "Last vaccinated" "Treatment" "Sequencing technology" "Assembly method" \
-    "Coverage" "Originating lab" "Address" "Sample ID given by originating laboratory" "Submitting lab" "Address" \
-    "Sample ID given by the submitting laboratory" "Authors" "Comment" "Comment Icon")
-    metadata_output "${header_2[@]}"
-        
-	# Parse FASTA file for N, create filtered lists
-        echo "------------------Processing Samples"
-        for f in `ls -1 "$fasta_not"`; do
+        # Create manifest for upload
+	# second line is needed for manual upload to gisaid website, but not required for CLI upload
+        echo "submitter,fn,covv_virus_name,covv_type,covv_passage,covv_collection_date,covv_location,covv_add_location,covv_host,covv_add_host_info,covv_sampling_strategy,covv_gender,covv_patient_age,covv_patient_status,covv_specimen,covv_outbreak,covv_last_vaccinated,covv_treatment,covv_seq_technology,covv_assembly_method,covv_coverage,covv_orig_lab,covv_orig_lab_addr,covv_provider_sample_id,covv_subm_lab,covv_subm_lab_addr,covv_subm_sample_id,covv_authors,covv_comment,comment_type" > $batched_meta
 
-                #skip the log text file
-                if [[ "$f" != *".fa"* ]]; then continue; fi
+        #echo "Submitter,\"FASTA filename\",\"Virus name\",Type,\"Passage details/history\",\"Collection date\",Location,\"Additional location information\",\
+        #        Host,\"Additional host information\",\"Sampling Strategy\",Gender,\"Patient age\",\"Patient status\",\"Specimen source\",\
+        #        Outbreak,\"Last vaccinated\",Treatment,\"Sequencing technology\",\"Assembly method\",\
+        #        Coverage,\"Originating lab\",Address,\"Sample ID given by originating laboratory\",\"Submitting lab\",\
+        #        Address,\"Sample ID given by the submitting laboratory\",Authors,Comment,\"Comment Icon\"" >> $batched_meta
 
-                #id sample
-                echo "---------------------------$f"
-
-                #set full file path
-                full_path="$fasta_not"/$f
-
-                #determine total number of seq
+        for f in `ls -1 "$fasta_notuploaded"`; do
+                # set full file path
+                # grab header line
+                # remove header <, SC, consensus_, and .consensus_threshold_[0-9].[0-9]_quality_[0-9]
+                #if header has a / then rearraign, otherwise use header
+                full_path="$fasta_notuploaded"/$f
+                full_header=`cat "$full_path" | grep ">"`
+                sample_id=`echo $full_header | awk '{ gsub(">", "")  gsub("SC", "") gsub("Consensus_","") \
+			gsub("[.]consensus_threshold_[0-9].[0-9]_quality_[0-9].*","") gsub(" ","") gsub(".consensus.fa",""); print $0}'`
+                
+		# determine total number of seq
+                # if the file is empty, set equal to 1
                 total_num=`cat "$full_path" | grep -v ">" | wc -m`
-
-                #if the file is empty, set equal to 1
                 if [ "$total_num" -eq 0 ]; then total_num=1; fi
 
-                #determine total number of N
+                # determine total number of N
+                # if there are no N's set value to 1
                 n_num=`cat "$full_path" | tr -d -c 'N' | awk '{ print length; }'`
-
-                #if there are no N's set value to 1
                 if [ ! -n "$n_num" ]; then n_num=1; fi
 
-                #if the frequency is higher than 50 GISAID will reject
-                #move failed files to failed folder and add to list
-                if [[ "$(($n_num*100/$total_num))" -gt $((config_percent_n)) ]]; then
-                        echo "$f has $(($n_num*100/$total_num))% N's" >> $failed_list
+                # if the frequency of N's is higher than 50 GISAID will reject
+                # the sample - screen and move any sample with N>50 to
+                # failed folder and add to list
+		percent_n_calc=$(($n_num*100/$total_num))
+                if [[ "$percent_n_calc" -gt $((config_percent_n_cutoff)) ]]; then
+			short_f=`echo $f | sed "s/.consensus.fa//"`
+			echo "$short_f,gisaid_fail,qc_${percent_n_calc}%_Ns" >> $gisaid_results
+                        mv "$full_path" "$fasta_failed"/"${sample_id}.consensus.fa"
                 else
-                        ## grab header line
-                        full_header=`cat "$full_path" | grep ">"`
-
-                        #remove header <, SC, consensus_, and .consensus_threshold_[0-9].[0-9]_quality_[0-9]
-                        #if header has a / then rearraign, otherwise use header
-                        sample_id=`echo $full_header | awk '{ gsub(">", "")  gsub("SC", "") gsub("Consensus_","") gsub("[.]consensus_threshold_[0-9].[0-9]_quality_[0-9].*","") gsub(" ",""); print $0}'`
-
                         #find associated metadata
-                        meta=`cat "$metadata_loc" | grep "$sample_id"`
-
-                        #if meta is found create input metadata row
+                        meta=`cat "$log_dir/${config_metadata_file}" | grep "$sample_id"`
+                        
+			#if meta is found create input metadata row
                         if [[ ! "$meta" == "" ]]; then
-
                                 #the filename that contains the sequence without path (e.g. all_sequences.fasta not c:\users\meier\docs\all_sequences.fasta)
                                 IFS='/' read -r -a strarr <<< "$full_path"
 
-                                #hCoV-19/Netherlands/Gelderland-01/2020 (Must be FASTA-Header from the FASTA file all_sequences.fasta)
-                                #take header (IE 2021064775) and turn into correct version hCoV-19/USA/OH-xxx/YYYY
-                                year=`echo $sample_id | cut -c1-4`
-                                cut_id=`echo $sample_id | awk '{ gsub("202",""); print $0}'`
-                                virus_name="hCoV*19/USA/OH*ODH*SC$cut_id/$year"
+                                #convert date to GISAID required format - 4/21/81 to 1981-04-21
+                                raw_date=`echo $meta | awk -F',' '{print $3}'`
+                                collection_yr=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[3]}' | tr -d '"'`
+                                collection_mn=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[1]}' | tr -d '"'`
+                                collection_dy=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[2]}' | tr -d '"'`
+				if [[ $collection_mn -lt 9 ]]; then collection_mn="0$collection_mn"; fi
+                                if [[ $collection_dy -lt 9 ]]; then collection_dy="0$collection_dy"; fi
+                                collection_date=${collection_yr}-${collection_mn}-${collection_dy}
 
-                                #Date in the format YYYY or YYYY-MM or YYYY-MM-DD
-                                #convert date to format above - 4/21/81 to 1981-04-21
-                                #add space to avoid errors with excel conversion
-                                raw_date=`echo $meta | awk -F',' '{print $1}' | sed 's/-/*/g'`
-                                collection_date=`echo "${raw_date}"-`
+				# take header (IE 2021064775) and turn into correct version hCoV-19/USA/OH-xxx/YYYY
+                                # for example: hCoV-19/Netherlands/Gelderland-01/2020 (Must be FASTA-Header from the FASTA file all_sequences.fasta)
+                                # year must be the collection year and not the analysis or sequencing year
+				# cut_id will be 2021064775 --> 1064775 OR 2022064775 --> 2064775 OR 2020064775 --> 1064775
+				year=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[3]}' | tr -d '"'`
+                                cut_id=`echo $sample_id | awk '{ gsub("2020","1") gsub("202",""); print $0}'`
+                                virus_name="hCoV-19/USA/OH-ODH-SC$cut_id/$year"
 
                                 #e.g. Europe / Germany / Bavaria / Munich
-                                county=`echo ${meta} | awk -F',' '{print $3}'`
-                                location=`echo North-America/USA/$county | sed 's/"//g'`
+                                county=`echo ${meta} | awk -F',' '{print $4}' | tr -d '"'`
+                                if [[ "$county" == *"OUT OF STATE"* ]]; then
+					location=`echo "North America/USA/"`
+				else
+					location=`echo "North America/USA/OHIO/$county"`
+				fi
 
+                                # Calculate the person's age in either years or months based on today's date
                                 #e.g.  65 or 7 months, or unknown
-                                patient_age=`echo $meta | awk -F',' '{print $6}'`
+                                raw_dob=`echo $meta | awk -F',' '{print $2}'`
+                                patient_yr=`echo "${raw_dob}" | awk '{split($0,a,"/"); print a[3]}' | sed 's/^0*//' | tr -d '"'`
+                                patient_mn=`echo "${raw_dob}" | awk '{split($0,a,"/"); print a[1]}' | sed 's/^0*//' | tr -d '"'`
+                                patient_dy=`echo "${raw_dob}" | awk '{split($0,a,"/"); print a[2]}' | sed 's/^0*//' | tr -d '"'`
 
-                                #given by the originating laboratory
-                                sample_ID_o=`echo $meta | awk -F',' '{print $4}'`
+                                today_yr=`date '+%Y' | sed 's/^0*//'`
+                                today_mn=`date '+%m' | sed 's/^0*//'`
+                                today_dy=`date '+%d' | sed 's/^0*//'`
 
-                                #given by the submitting laboratory
-                                sample_ID_s=`echo $meta | awk -F',' '{print $5}'`
+                                agey=$(($today_yr-$patient_yr))
+                                agem=$(($today_mn-$patient_mn))
+                                aged=$(($today_dy-$patient_dy))
 
-                                #format config variables
-                                config_submitter=$(cat "${pipeline_config}" | grep "submitter: " | sed 's/submitter: //' | sed 's/"//g')
-                                config_format ${config_submitter}
-                                submitter=$input_variable
+                                # if patient is <0 then add months
+                                if [[ $agey -eq 0 ]]; then
+                                        agey="$patient_mn months"
+                                fi
 
-                                config_type=$(cat "${pipeline_config}" | grep "type: " | sed 's/type: //' | sed 's/"//g')
-                                config_format ${config_type}
-                                type=$input_variable
-
-                                config_passage=$(cat "${pipeline_config}" | grep "passage: " | sed 's/passage: //' | sed 's/"//g')
-                                config_format ${config_passage}
-                                passage=$input_variable
-
-                                config_additional_location_information=$(cat "${pipeline_config}" | grep "additional_location_information: " | sed 's/additional_location_information: //' | sed 's/"//g')
-                                config_format ${config_additional_location_information}
-                                additional_location_information=$input_variable
-
-                                config_host=$(cat "${pipeline_config}" | grep "host: " | sed 's/host: //' | sed 's/"//g')
-                                config_format ${config_host}
-                                host=$input_variable
-
-                                config_additional_host_information=$(cat "${pipeline_config}" | grep "additional_host_information: " | sed 's/additional_host_information: //' | sed 's/"//g')
-                                config_format ${config_additional_host_information}
-                                additional_host_information=$input_variable
-
-                                config_sampling_strategy=$(cat "${pipeline_config}" | grep "sampling_strategy: " | sed 's/sampling_strategy: //' | sed 's/"//g')
-                                config_format ${config_sampling_strategy}
-                                sampling_strategy=$input_variable
-
-                                config_gender=$(cat "${pipeline_config}" | grep "gender: " | sed 's/gender: //' | sed 's/"//g')
-                                config_format ${config_gender}
-                                gender=$input_variable
-
-                                config_patient_status=$(cat "${pipeline_config}" | grep "patient_status: " | sed 's/patient_status: //' | sed 's/"//g')
-                                config_format ${config_patient_status}
-                                patient_status=$input_variable
-
-                                config_specimen_source=$(cat "${pipeline_config}" | grep "specimen_source: " | sed 's/specimen_source: //' | sed 's/"//g')
-                                config_format ${config_specimen_source}
-                                specimen_source=$input_variable
-
-                                config_outbreak=$(cat "${pipeline_config}" | grep "outbreak: " | sed 's/outbreak: //' | sed 's/"//g')
-                                config_format ${config_outbreak}
-                                outbreak=$input_variable
-
-                                config_last_vaccinated=$(cat "${pipeline_config}" | grep "last_vaccinated: " | sed 's/last_vaccinated: //' | sed 's/"//g')
-                                config_format ${config_last_vaccinated}
-                                last_vaccinated=$input_variable
-
-                                config_treatment=$(cat "${pipeline_config}" | grep "treatment: " | sed 's/treatment: //' | sed 's/"//g')
-                                config_format ${config_treatment}
-                                treatment=$input_variable
-
-                                config_sequencing_technology=$(cat "${pipeline_config}" | grep "sequencing_technology: " | sed 's/sequencing_technology: //' | sed 's/"//g')
-                                config_format ${config_sequencing_technology}
-                                sequencing_technology=$input_variable
-
-                                config_assembly_method=$(cat "${pipeline_config}" | grep "assembly_method: " | sed 's/assembly_method: //' | sed 's/"//g')
-                                config_format ${config_assembly_method}
-                                assembly_method=$input_variable
-
-                                config_coverage=$(cat "${pipeline_config}" | grep "coverage: " | sed 's/coverage: //' | sed 's/"//g')
-                                config_format ${config_coverage}
-                                coverage=$input_variable
-
-                                config_submitting_lab=$(cat "${pipeline_config}" | grep "submitting_lab: " | sed 's/submitting_lab: //' | sed 's/"//g')
-                                config_format ${config_submitting_lab}
-                                submitting_lab=$input_variable
-
-                                config_address_submitting=$(cat "${pipeline_config}" | grep "address_submitting: " | sed 's/address_submitting: //' | sed 's/"//g')
-                                config_format ${config_address_submitting}
-                                address_submitting=$input_variable
-
-                                config_authors=$(cat "${pipeline_config}" | grep "authors: " | sed 's/authors: //' | sed 's/"//g')
-                                config_format ${config_authors}
-                                authors=$input_variable
+                                # if the patients birthday hasn't happened, adjust
+                                if [[ $agem -lt 0 ]]; then
+                                        agey=$((agey-1))
+                                elif [[ $agem -eq 0 && $aged -lt 0 ]] ; then
+                                        agey=$((agey-1))
+                                fi
 
                                 #add output variables to metadata file
-                                metadata_array=`echo "${submitter} ${FASTA_filename} \
-                                ${virus_name} ${type} ${passage} ${collection_date} ${location} \
-                                ${additional_location_information} ${host} ${additional_host_information} \
-                                ${sampling_strategy} ${gender} ${patient_age} ${patient_status} \
-                                ${specimen_source} ${outbreak} ${last_vaccinated} ${treatment} \
-                                ${sequencing_technology} ${assembly_method} ${coverage} \"${submitting_lab}\" \
-                                \"${address_submitting}\" ${sample_ID_o} \"${submitting_lab}\" \"${address_submitting}\" \
-                                ${sample_ID_s} \"${authors}\""`
-
-                                metadata_output "${metadata_array[@]}"
-
-                                #add file name to log
-                                echo "$full_path" >> $passed_list
+				#excel metadata files may add what is viewed as "^M" to the end line of the file
+				# this is interpreted as "\r" however and must be removed
+				echo "${config_submitter},${FASTA_filename},${virus_name},${config_type},${config_passage},${collection_date},\"${location}\",${config_additional_location_information},${config_host},${config_additional_host_information},${config_sampling_strategy},${config_gender},${agey},${config_patient_status},${config_specimen_source},${config_outbreak},${config_last_vaccinated},${config_treatment},${config_sequencing_technology},${config_assembly_method},${config_coverage},\"${config_submitting_lab}\",\"${config_address_submitting}\",${sample_id},\"${config_submitting_lab}\",\"${config_address_submitting}\",${sample_id},\"${config_authors}\"" >> $batched_meta
+				sed -i "s/\r//" $batched_meta
 
                                 # merge all fasta files that pass QC and metadata into one
                                 # skips the header line and any odd formatted /date lines that follow
                                 echo ">$virus_name" | sed 's/*/-/g' >> $batched_fasta
                                 cat "$full_path" | grep -v ">" | grep -v "/" >> $batched_fasta
 
-                                #move original file to completed dir
-                                mv "$full_path" "$fasta_uploaded"/${header_array[0]}
-
-                        #if meta is not found, add to failed list
                         else
-                                echo "$sample_id Missing metadata" >> $failed_list
+                                # add sample to results, move associated files
+                                echo "$sample_id,gisaid_fail,qc_missing_metadata" >> $gisaid_results
+                                mv "$full_path" "$fasta_failed"/${sample_id}.fa
                         fi
                 fi
         done
+fi
 
-        #add qc failure log to not complete folder
-        if [[ ! -f "$failed_compiled" ]]; then touch "$failed_compiled"; fi
-        cat "$failed_list" >> "$failed_compiled"
+if [[ "$pipeline_upload" == "Y" ]]; then
+	echo "----UPLOADING"
+	# if this is a re-run, save previous log file
+	if [[ -f "${gisaid_log}" ]]; then mv ${gisaid_log} ${gisaid_log}_v1; fi
+	
+	cli2 upload --metadata $batched_meta --fasta $batched_fasta --token $gisaid_auth --log $gisaid_log --failed $gisaid_failed --frameshift catch_novel
+fi
 
-elif [[ "$pipe_upload" == "Y" ]]; then
-        #upload samples
-        cli2 upload --metadata $batched_metadata --fasta $batched_fasta
+if [[ "$pipeline_qc" == "Y" ]]; then
+	echo "----RUNNING QC"
+	# then pull line by grouping and determine metdata information
+	# uploaded: EPI_ID
+	# duplicated: EPI_ID
+	# errors: columns which had errors
+	samples_uploaded=`cat $gisaid_log | grep "epi_isl_id" | grep -v "validation_error" | grep -o "SC[0-9]*./202[0-9]"`
+	samples_duplicated=`cat $gisaid_log | grep "existing_ids" | grep -o "SC[0-9]*./202[0-9]"`
+	samples_manifest_errors=`cat $gisaid_log | grep "field_missing" | grep -o "SC[0-9]*./202[0-9]"`
 
-        #parse log file
+	## for samples that successfully uploaded, pull the GISAID ID
+	## move samples to uploaded folder
+	for log_line in ${samples_uploaded[@]}; do
+		sample_line=`cat $gisaid_log | grep "${log_line}"`
+		epi_id=`echo $sample_line | grep -o "EPI_ISL_[0-9]*.[0-9]"`
+		sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-9]" | sed "s/SC//" | sed "s/202[1,2]/202/" | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
+		
+		mv ${fasta_notuploaded}/${sample_id}.* ${fasta_uploaded}
+		echo "$sample_id,gisaid_pass,$epi_id" >> $gisaid_results
+	done
 
-        #create gisaid_results file
+	## for samples that have already been uploaded, add previous id
+	## move samples to uploaded folder
+	for log_line in ${samples_duplicated[@]}; do
+                sample_line=`cat $gisaid_log | grep "${log_line}"`
+		epi_id=`echo $sample_line | grep -o "EPI_ISL_[0-9]*.[0-9]"`
+                sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-9]" | sed "s/SC//" | sed "s/202[1,2]/202/" | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
+		
+		mv ${fasta_notuploaded}/${sample_id}.* ${fasta_uploaded}
+		echo "$sample_id,gisaid_fail,duplicated_id:$epi_id" >> $gisaid_results
+	done
 
-        #add samples to the fail file
-
-        #move failed samples to not uploaded
+        ## for samples that had manifest error issues, add error
+	## move samples to failed folder
+	for log_line in ${samples_manifest_errors[@]}; do
+                sample_line=`cat $gisaid_log | grep "${log_line}"`
+		manifest_col=`echo $sample_line | cut -f3 -d"{" | sed "s/field_missing_error//g" | sed "s/\"//g" | sed 's/[\]//g' | sed "s/: , /,/g" | sed "s/: }//g" | sed "s/}//g"`
+		sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-9]" | sed "s/SC//" | sed "s/202[1,2]/202/" | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
+		
+		mv ${fasta_notuploaded}/${sample_id}.* ${fasta_failed}
+		echo "$sample_id,gisaid_fail,manifest_errors:$manifest_col" >> $gisaid_results
+        done
+	
+	# merge gisaid results to final results file by sample id
+        sort $gisaid_results > tmp_gresults.txt
+	sort $final_results > tmp_fresults.txt
+	echo "sample_id,gisaid_status,gisaid_notes,pango_qc,nextclade_clade,pangolin_lineage,pangolin_scorpio,aa_substitutions" > $final_results
+	join <(sort tmp_gresults.txt) <(sort tmp_fresults.txt) -t $',' >> $final_results
+	rm tmp_fresults.txt tmp_gresults.txt
 
 fi
 
+if [[ "$pipeline_rejected" == "Y" ]]; then
+        echo "----PROCESSING REJECTED SAMPLES"
+        # when a sample is rejected user creates /output/dir/analysis/intermed/gisaid_rejected.csv file
+	# information includes full sample name followed by "," and reason. these include
+	# frameshift, other, truncation
+
+	# code below will pull this line and update the final_results file with new information
+	rejected_lines=`cat $gisaid_rejected`
+
+        ## for samples that were rejected, update the final analysis file
+        ## move samples to failed folder
+        for rejected_line in ${rejected_lines[@]}; do
+		
+		# grab sampleID
+		sample_id=202`echo $rejected_line | cut -f3 -d'/' | cut -f3 -d"-" | sed "s/SC//g"`
+		
+		reject_reason=`echo $rejected_line | cut -f2 -d","`
+
+		results_line=`cat $final_results | grep "${sample_id}"`
+		new_line=`echo $results_line | sed "s/gisaid_pass/gisaid_rejected/g" | sed "s/EPI/$reject_reason-EPI/g"`
+
+		# move file to notuploaded dir
+		mv ${fasta_uploaded}/${sample_id}.* ${fasta_failed}
+		
+		# replace the old line with the new line
+		sed -i "s/$results_line/$new_line/" $final_results
+        done
+fi
