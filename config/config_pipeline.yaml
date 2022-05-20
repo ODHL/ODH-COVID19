@@ -1,0 +1,62 @@
+############################### 
+# MANDATORY
+###############################
+################ CECRET
+# number of sample to be run in each batch
+# --miseq runs should be 55 or less
+# --nextseq runs should be 30 or less
+batch_limit: "55"
+
+# pangolin version
+# to check versions available go to: https://hub.docker.com/r/staphb/pangolin/tags
+# 18 for 3.1.18-pangolearn-2022-01-20
+# 19 for 3.1.19-pangolearn-2022-01-20
+# 20 for 3.1.20-pangolearn-2022-02-02
+# 21 for 3.1.20-pangoLearn-2022-02-28
+pangolin_version: "21"
+
+# nextclade version
+# to check versions available to go: https://hub.docker.com/r/nextstrain/nextclade/tags
+# 1 for nextstrain/nextclade:1.9.0
+# 2 for nextstrain/nextclade:1.10.2
+# 3 for nextstrain/nextclade:1.10.3
+# 4 for nexstrain/nextclade:1.11.0
+nextclade_version: "4"
+
+# reference files
+reference_dir: "/home/jenniferh/analysis_workflow/refs"
+reference_genome: "MN908947.3.fasta"
+gff_file: "MN908947.3.gff"
+primer_bed: "artic_V4.1_SARS-CoV-2.primer.bed"
+amplicon_bed: "artic_V4.1_SARS-CoV-2.insert.bed"
+primer_set: "ncov_V4.1"
+
+############# GISAID 
+percent_n_cutoff: 50
+metadata_file: "merged_complete.csv"
+gisaid_auth: "/home/jenniferh/analysis_workflow/bin/gisaid/authtokens/sevillas2/gisaid.authtoken"
+
+submitter: "sevillas2"
+type: "betacoronavirus"
+passage: "Original"
+host: "Human"
+gender: "unknown"
+patient_status: "unknown"
+sequencing_technology: "Illumina Miseq"
+submitting_lab: "Ohio Department of Health Laboratory"
+address_submitting: "8995 East Main Street, Reynoldsburg, Ohio 43068"
+authors: "Samantha Sevilla, Jennifer Holmes, Eric Brandt, Keoni Omura, Glen McGillivary, Caitlin McDonnell, Jade Mowery, Stephanie Mccracken, Tyler Payne, Kirtana Ramadugu, Erica Leasure, Brent Lee, Kelsey Florek, Heather Blankenship, Allison Black, Quanta Brown, Tammy Bannerman"
+
+###############################
+# Optional
+###############################
+################ GISAID
+additional_location_information: ""
+additional_host_information: ""
+sampling_strategy: ""
+specimen_source: ""
+outbreak: ""
+last_vaccinated: ""
+treatment: ""
+assembly_method: ""
+coverage: ""
