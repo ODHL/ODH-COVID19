@@ -751,21 +751,38 @@ elif [[ "$pipeline" == "ncbi" ]]; then
        	echo "*** STARTING NCBI PIPELINE ***" >> $pipeline_log
         echo "*** STARTING NCBI PIPELINE ***"
 
+	# set args
 	date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
-	ncbi_metadata=$log_dir/${project_id}_${date_stamp}.tsv
+	ncbi_mput=$log_dir/${project_id}_${date_stamp}_mput.txt
+	gisaid_results=$analysis_dir/intermed/gisaid_results.csv
 
         # Eval YAML args
 	eval $(parse_yaml ${pipeline_config} "config_")
 	metadata_file="$log_dir/$config_metadata_file"
 
-        # determine number of samples
-	fasta_number=`ls "$fasta_dir/upload_partial"/ | wc -l`
-	
+        # run inital upload or merge results
+	if [[ $reject_flag == "N" ]]; then	
+		# determine number of samples
+		fasta_number=`ls "$fasta_dir/upload_partial"/ | wc -l`
+		
+		if [[ $fasta_number -gt 1 ]]; then
+			# create mput command
+			ls $analysis_dir/fasta/upload_partial | tr "\n" " " > $ncbi_mput
 
-	if [[ $fasta_number -gt 1 ]]; then
-		bash scripts/ncbi_upload.sh ncbi_metadata
+			# run batch command
+			bash scripts/ncbi.sh "${output_dir}" "${project_id}" "${pipeline_config}" "${final_results}" "${gisaid_results}" "${reject_flag}"
+	
+			# echo the mput command
+			echo "*** COMPLETED NCBI PIPELINE ***"
+			echo
+			echo "cat $ncbi_mput"
+			echo
+		else
+			echo "No samples for upload"
+		fi
 	else
-		echo "No samples for upload"
+		# run batch command
+		bash scripts/ncbi.sh "${output_dir}" "${project_id}" "${pipeline_config}" "${final_results}" "${gisaid_results}" "${reject_flag}"
 	fi
 
 elif [[ "$pipeline" == "stats" ]]; then

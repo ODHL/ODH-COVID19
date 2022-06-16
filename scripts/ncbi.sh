@@ -42,7 +42,7 @@ fasta_uploaded=$output_dir/analysis/fasta/upload_complete
 log_dir=$output_dir/logs
 
 # set files
-ncbi_metadata=$log_dir/${project_id}_${date_stamp}_metadata.tsv
+ncbi_metadata=$log_dir/batched_meta_${project_id}_${date_stamp}_ncbi.tsv
 ncbi_results=$output_dir/analysis/intermed/ncbi_results.csv
 
 #########################################################
@@ -63,37 +63,36 @@ fi
 if [[ "$pipeline_prep" == "Y" ]]; then
         echo "----PREPARING FILES"
 	# create files
-    if [[ -f $metadata_results ]]; then rm $metadata_results; fi
+    if [[ -f $ncbi_metadata ]]; then rm $ncbi_metadata; fi
     if [[ -f $ncbi_results ]]; then rm $ncbi_results; fi
-	touch $metadata_results
 	touch $ncbi_results
 
     # Create manifest for upload
 	# second line is needed for manual upload to ncbi website, but not required for CLI upload
-    chunk1="*sample_name\tsample_title\tbioproject_accession\t*organism\t*collected_by\t*collection_date\t*geo_loc_name\t*host"
+    	chunk1="*sample_name\tsample_title\tbioproject_accession\t*organism\t*collected_by\t*collection_date\t*geo_loc_name\t*host"
 	chunk2="*host_disease\t*isolate\t*isolation_source\tantiviral_treatment_agent\tcollection_device\tcollection_method\tdate_of_prior_antiviral_treat"
 	chunk3="date_of_prior_sars_cov_2_infection\tdate_of_sars_cov_2_vaccination\texposure_event\tgeo_loc_exposure\tgisaid_accession\tgisaid_virus_name"
 	chunk4="host_age\thost_anatomical_material\thost_anatomical_part\thost_body_product\thost_disease_outcome\thost_health_state\thost_recent_travel_loc"
 	chunk5="host_recent_travel_return_date\thost_sex\thost_specimen_voucher\thost_subject_id\tlat_lon\tpassage_method\tpassage_number\tprior_sars_cov_2_antiviral_treat"
 	chunk6="prior_sars_cov_2_infection\tprior_sars_cov_2_vaccination\tpurpose_of_sampling\tpurpose_of_sequencing\tsars_cov_2_diag_gene_name_1\tsars_cov_2_diag_gene_name_2"
 	chunk7="sars_cov_2_diag_pcr_ct_value_1\tsars_cov_2_diag_pcr_ct_value_2\tsequenced_by\tvaccine_received\tvirus_isolate_of_prior_infection\tdescription"
-	echo "${chunk1}\t${chunk2}\t${chunk3}\t${chunk4}\t${chunk5}\t${chunk6}\t${chunk7}" > $metadata_results
+	echo -e "${chunk1}\t${chunk2}\t${chunk3}\t${chunk4}\t${chunk5}\t${chunk6}\t${chunk7}" > $ncbi_metadata
 
     for f in `ls -1 "$fasta_partial"`; do
 		# set full file path
-        # grab header line
+        	# grab header line
 		# remove header <, SC, consensus_, and .consensus_threshold_[0-9].[0-9]_quality_[0-9]
 		#if header has a / then rearraign, otherwise use header
-		full_path="$fasta_notuploaded"/$f
+		full_path="$fasta_partial"/$f
 		full_header=`cat "$full_path" | grep ">"`
 		sample_id=`echo $full_header | awk '{ gsub(">", "")  gsub("SC", "") gsub("Consensus_","") \
 		gsub("[.]consensus_threshold_[0-9].[0-9]_quality_[0-9].*","") gsub(" ","") gsub(".consensus.fa",""); print $0}'`
                 
 		#find associated metadata
-        meta=`cat "$log_dir/${config_metadata_file}" | grep "$sample_id"`
+		meta=`cat "$log_dir/${config_metadata_file}" | grep "$sample_id"`
                         
 		#if meta is found create input metadata row
-        if [[ ! "$meta" == "" ]]; then
+        	if [[ ! "$meta" == "" ]]; then
 			#the filename that contains the sequence without path (e.g. all_sequences.fasta not c:\users\meier\docs\all_sequences.fasta)
 			IFS='/' read -r -a strarr <<< "$full_path"
 
@@ -102,10 +101,10 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 			collection_yr=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[3]}' | tr -d '"'`
 			collection_mn=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[1]}' | tr -d '"'`
 			collection_dy=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[2]}' | tr -d '"'`
-			if [[ $collection_mn -lt 9 ]]; then collection_mn="0$collection_mn"; fi
-			if [[ $collection_dy -lt 9 ]]; then collection_dy="0$collection_dy"; fi
+			if [[ $collection_mn -lt 10 ]]; then collection_mn="0$collection_mn"; fi
+			if [[ $collection_dy -lt 10 ]]; then collection_dy="0$collection_dy"; fi
 			collection_date=${collection_yr}-${collection_mn}-${collection_dy}
-
+			
 			# take header (IE 2021064775) and turn into correct version hCoV-19/USA/OH-xxx/YYYY
 			# for example: hCoV-19/Netherlands/Gelderland-01/2020 (Must be FASTA-Header from the FASTA file all_sequences.fasta)
 			# year must be the collection year and not the analysis or sequencing year
@@ -126,21 +125,21 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 			gisaid_accession=`cat $gisaid_results | grep $sample_id | cut -f3 -d","`
 
 			# break output into chunks
-			chunk1="{sc_id}\t{$config_sample_title}}\t{$config_bioproject_accession}\t{$config_organism}\t{$config_collected_by}"
-			chunk2="{$collection_date}\t{$config_geo_loc_name}\t{$config_host}\t{$config_host_disease}\t{$sample_id}"
-			chunk3="{$config_isolation_source}\t{$config_antiviral_treatment_agent}\t{$config_collection_device}"
-			chunk4="{$config_collection_method}\t{$config_date_of_prior_antiviral_treat}\t{$config_date_of_prior_sars_cov_2_infection}"
-			chunk5="{$config_date_of_sars_cov_2_vaccination}\t{$config_exposure_event}\t{$config_geo_loc_exposure}"
-			chunk6="{$gisaid_accession}\t{$virus_name}\t{$config_host_age}\t{$config_host_anatomical_material}\t{$config_host_anatomical_part}"
-			chunk7="{$config_host_body_product}\t{$config_host_disease_outcome}\t{$config_host_health_state}\t{$config_host_recent_travel_loc}"
-			chunk8="{$config_host_recent_travel_return_date}\t{$config_host_sex}\t{$config_host_specimen_voucher}\t{$config_host_subject_id}"
-			chunk9="{$config_lat_lon}\t{$config_passage_method}\t{$config_passage_number}\t{$config_prior_sars_cov_2_antiviral_treat}\t{$config_prior_sars_cov_2_infection}"
-			chunk10="{$config_prior_sars_cov_2_vaccination}\t{$config_purpose_of_sampling}\t{$config_purpose_of_sequencing}\t{$config_sars_cov_2_diag_gene_name_1}"
-			chunk11="{$config_sars_cov_2_diag_gene_name_2}\t{$config_sars_cov_2_diag_pcr_ct_value_1}\t{$config_sars_cov_2_diag_pcr_ct_value_2}"
-			chunk12="{$config_sequenced_by}\t{$config_vaccine_received}\t{$config_virus_isolate_of_prior_infection}\t{$config_description"
+			chunk1="${sc_id}\t${config_sample_title}\t${config_bioproject_accession}\t${config_organism}\t${config_collected_by}"
+			chunk2="${collection_date}\t${location}\t${config_host}\t${config_host_disease}\t${sample_id}"
+			chunk3="${config_isolation_source}\t${config_antiviral_treatment_agent}\t${config_collection_device}"
+			chunk4="${config_collection_method}\t${config_date_of_prior_antiviral_treat}\t${config_date_of_prior_sars_cov_2_infection}"
+			chunk5="${config_date_of_sars_cov_2_vaccination}\t${config_exposure_event}\t${config_geo_loc_exposure}"
+			chunk6="${gisaid_accession}\t${virus_name}\t${config_host_age}\t${config_host_anatomical_material}\t${config_host_anatomical_part}"
+			chunk7="${config_host_body_product}\t${config_host_disease_outcome}\t${config_host_health_state}\t${config_host_recent_travel_loc}"
+			chunk8="${config_host_recent_travel_return_date}\t${config_host_sex}\t${config_host_specimen_voucher}\t${config_host_subject_id}"
+			chunk9="${config_lat_lon}\t${config_passage_method}\t${config_passage_number}\t${config_prior_sars_cov_2_antiviral_treat}\t${config_prior_sars_cov_2_infection}"
+			chunk10="${config_prior_sars_cov_2_vaccination}\t${config_purpose_of_sampling}\t${config_purpose_of_sequencing}\t${config_sars_cov_2_diag_gene_name_1}"
+			chunk11="${config_sars_cov_2_diag_gene_name_2}\t${config_sars_cov_2_diag_pcr_ct_value_1}\t${config_sars_cov_2_diag_pcr_ct_value_2}"
+			chunk12="${config_sequenced_by}\t${config_vaccine_received}\t${config_virus_isolate_of_prior_infection}\t${config_description}"
 			
 			#add output variables to metadata file
-			echo "${chunk1}\t${chunk2}\t${chunk3}\t${chunk4}\t${chunk5}\t${chunk6}\t${chunk7}\t${chunk8}\t${chunk9}\t${chunk10}\t${chunk11}\t${chunk12}" >> $metadata_results
+			echo -e "${chunk1}\t${chunk2}\t${chunk3}\t${chunk4}\t${chunk5}\t${chunk6}\t${chunk7}\t${chunk8}\t${chunk9}\t${chunk10}\t${chunk11}\t${chunk12}" >> $ncbi_metadata
 			
             fi
         done
