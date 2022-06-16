@@ -45,7 +45,7 @@ log_dir=$output_dir/logs
 gisaid_log="$log_dir/gisaid_log_${project_id}_${date_stamp}.txt"
 gisaid_failed="$log_dir/gisaid_failed_${project_id}_${date_stamp}.txt"
 gisaid_results="$output_dir/analysis/intermed/gisaid_results.csv"
-gisaid_rejected="$output_dir/analysis/intermed/gisaid_rejected.csv"
+gisaid_rejected="$output_dir/analysis/intermed/gisaid_rejected_tmp.csv"
 
 FASTA_filename="batched_fasta_${project_id}_${date_stamp}.fasta"
 batched_fasta="$log_dir/$FASTA_filename"
@@ -122,7 +122,7 @@ if [[ "$pipeline_prep" == "Y" ]]; then
                 if [[ "$percent_n_calc" -gt $((config_percent_n_cutoff)) ]]; then
 			short_f=`echo $f | sed "s/.consensus.fa//"`
 			echo "$short_f,gisaid_fail,qc_${percent_n_calc}%_Ns" >> $gisaid_results
-                        mv "$full_path" "$fasta_failed"/"${sample_id}.consensus.fa"
+                        mv "$full_path" "$fasta_failed"/"${sample_id}.fa"
                 else
                         #find associated metadata
                         meta=`cat "$log_dir/${config_metadata_file}" | grep "$sample_id"`
@@ -265,10 +265,10 @@ if [[ "$pipeline_qc" == "Y" ]]; then
 fi
 
 if [[ "$pipeline_rejected" == "Y" ]]; then
-        echo "----PROCESSING REJECTED SAMPLES"
-        # when a sample is rejected user creates /output/dir/analysis/intermed/gisaid_rejected.csv file
-	# information includes full sample name followed by "," and reason. these include
-	# frameshift, other, truncation
+        echo "------PROCESSING REJECTED SAMPLES"
+        # when a sample is rejected user creates analysis_workflow/reject_search.csv file
+	# information includes full sample name followed by "," and reason. these include frameshift, qc, other, truncation
+	# eg 
 
 	# code below will pull this line and update the final_results file with new information
 	rejected_lines=`cat $gisaid_rejected`
