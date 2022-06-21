@@ -4,9 +4,9 @@
 output_dir=$1
 project_id=$2
 pipeline_config=$3
-final_results=$4
-gisaid_results=$5
-reject_flag=$6
+gisaid_results=$4
+reject_flag=$5
+final_results=$6
 
 #########################################################
 # functions
@@ -40,10 +40,16 @@ date_stamp=`date '+%Y_%m_%d'`
 fasta_partial=$output_dir/analysis/fasta/upload_partial
 fasta_uploaded=$output_dir/analysis/fasta/upload_complete
 log_dir=$output_dir/logs
+ncbi_hold="../ncbi_hold/$project_id"
 
 # set files
-ncbi_metadata=$log_dir/batched_meta_${project_id}_${date_stamp}_ncbi.tsv
+ncbi_attributes=$log_dir/batched_ncbi_att_${project_id}_${date_stamp}.tsv
+ncbi_metadata=$log_dir/batched_ncbi_meta_${project_id}_${date_stamp}.tsv
+ncbi_output=$ncbi_hold/complete/metadata*
 ncbi_results=$output_dir/analysis/intermed/ncbi_results.csv
+
+# set basespace command
+basespace_command=${config_basespace_cmd}
 
 #########################################################
 # Controls
@@ -51,10 +57,12 @@ ncbi_results=$output_dir/analysis/intermed/ncbi_results.csv
 # to run cleanup of frameshift samples, pass frameshift_flag
 if [[ $reject_flag == "N" ]]; then
 	pipeline_prep="Y"
-	pipeline_rejected="N"
+	pipeline_download="Y"
+	pipeline_sra="N"
 else
 	pipeline_prep="N"
-	pipeline_rejected="Y"
+	pipeline_download="N"
+	pipeline_sra="Y"
 fi
 
 #########################################################
@@ -67,8 +75,7 @@ if [[ "$pipeline_prep" == "Y" ]]; then
     if [[ -f $ncbi_results ]]; then rm $ncbi_results; fi
 	touch $ncbi_results
 
-    # Create manifest for upload
-	# second line is needed for manual upload to ncbi website, but not required for CLI upload
+    	# Create manifest for attribute upload
     	chunk1="*sample_name\tsample_title\tbioproject_accession\t*organism\t*collected_by\t*collection_date\t*geo_loc_name\t*host"
 	chunk2="*host_disease\t*isolate\t*isolation_source\tantiviral_treatment_agent\tcollection_device\tcollection_method\tdate_of_prior_antiviral_treat"
 	chunk3="date_of_prior_sars_cov_2_infection\tdate_of_sars_cov_2_vaccination\texposure_event\tgeo_loc_exposure\tgisaid_accession\tgisaid_virus_name"
@@ -76,7 +83,13 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 	chunk5="host_recent_travel_return_date\thost_sex\thost_specimen_voucher\thost_subject_id\tlat_lon\tpassage_method\tpassage_number\tprior_sars_cov_2_antiviral_treat"
 	chunk6="prior_sars_cov_2_infection\tprior_sars_cov_2_vaccination\tpurpose_of_sampling\tpurpose_of_sequencing\tsars_cov_2_diag_gene_name_1\tsars_cov_2_diag_gene_name_2"
 	chunk7="sars_cov_2_diag_pcr_ct_value_1\tsars_cov_2_diag_pcr_ct_value_2\tsequenced_by\tvaccine_received\tvirus_isolate_of_prior_infection\tdescription"
-	echo -e "${chunk1}\t${chunk2}\t${chunk3}\t${chunk4}\t${chunk5}\t${chunk6}\t${chunk7}" > $ncbi_metadata
+	echo -e "${chunk1}\t${chunk2}\t${chunk3}\t${chunk4}\t${chunk5}\t${chunk6}\t${chunk7}" > $ncbi_attributes
+
+	# Create manifest for metadata upload
+	chunk1="sample_name\tlibrary_ID\ttitle\tlibrary_strategy\tlibrary_source\tlibrary_selection"
+	chunk2="library_layout\tplatform\tinstrument_model\tdesign_description\tfiletype\tfilename"
+	chunk3="filename2\tfilename3\tfilename4\tassembly\tfasta_file"
+	echo -e "${chunk1}\t${chunk2}\t${chunk3}" > $ncbi_metadata
 
     for f in `ls -1 "$fasta_partial"`; do
 		# set full file path
@@ -121,8 +134,10 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 				location=`echo "USA: Ohio"`
 			fi
 
+			# set remaining variables
 			sc_id=`echo $virus_name | cut -f4 -d"-" | cut -f1 -d"/"`
 			gisaid_accession=`cat $gisaid_results | grep $sample_id | cut -f3 -d","`
+			sample_title=`echo "${config_library_strategy} of ${config_organism}: ${config_isolation_source}"`
 
 			# break output into chunks
 			chunk1="${sc_id}\t${config_sample_title}\t${config_bioproject_accession}\t${config_organism}\t${config_collected_by}"
@@ -138,48 +153,100 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 			chunk11="${config_sars_cov_2_diag_gene_name_2}\t${config_sars_cov_2_diag_pcr_ct_value_1}\t${config_sars_cov_2_diag_pcr_ct_value_2}"
 			chunk12="${config_sequenced_by}\t${config_vaccine_received}\t${config_virus_isolate_of_prior_infection}\t${config_description}"
 			
-			#add output variables to metadata file
-			echo -e "${chunk1}\t${chunk2}\t${chunk3}\t${chunk4}\t${chunk5}\t${chunk6}\t${chunk7}\t${chunk8}\t${chunk9}\t${chunk10}\t${chunk11}\t${chunk12}" >> $ncbi_metadata
-			
+			#add output variables to attributes file
+			echo -e "${chunk1}\t${chunk2}\t${chunk3}\t${chunk4}\t${chunk5}\t${chunk6}\t${chunk7}\t${chunk8}\t${chunk9}\t${chunk10}\t${chunk11}\t${chunk12}" >> $ncbi_attributes
+		
+			# breakoutput into chunks
+			chunk1="${sc_id}\t${sample_id}\t${sample_title}\t${config_library_strategy}\t${config_library_source}\t${config_library_selection}"
+			chunk2="${config_library_layout}\t${config_platform}\t${config_instrument_model}\t${config_design_description}\t${config_filetype}\t${sample_id}_R1.fastq.gz"
+			chunk3="${sample_id}_R2.fastq.gz\t${config_filename3}\t${config_filename4}\t${assembly}\t${config_fasta_file}"
+
+			#add output variables to attributes file
+                        echo -e "${chunk1}\t${chunk2}\t${chunk3}" >> $ncbi_metadata
             fi
         done
 fi
 
-if [[ "$pipeline_rejected" == "Y" ]]; then
-	echo "----RUNNING QC"
-	# then pull line by grouping and determine metdata information
-	# uploaded: ncbi_id
-	# errors: failed
-	samples_uploaded=`cat $ncbi_log | grep "SRA" | cut -f1 -d","`
-	samples_failed=`cat $ncbi_log | grep "failed" | cut -f1 -d","`
+if [[ "$pipeline_download" == "Y" ]]; then
 
-	## for samples that successfully uploaded, pull the ncbi ID
-	## move samples to uploaded folder
-	for log_line in ${samples_uploaded[@]}; do
-		sample_line=`cat $ncbi_log | grep "${log_line}"`
-		ncbi_id=`echo $sample_line | grep -o "EPI_ISL_[0-9]*.[0-9]"`
-		sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-9]" | sed "s/SC//" | sed "s/202[1,2]/202/" | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
-		
-		mv ${fasta_notuploaded}/${sample_id}.* ${fasta_uploaded}
-		echo "$sample_id,ncbi_pass,$ncbi_id" >> $ncbi_results
+	# create tmp ncbi hold dir
+	if [[ ! -d $ncbi_hold ]]; then mkdir -p $ncbi_hold; fi	
+
+	# download fastq files for samples uploaded to gisaid	
+	for f in `ls -1 "$fasta_partial"`; do
+		download_name=`echo $f | cut -f1 -d"."`
+		$basespace_command download biosample -n ${download_name}-${project_id} -o $ncbi_hold
 	done
 
-    ## for samples that had manifest error issues, add error
-	## move samples to failed folder
-	for log_line in ${samples_manifest_errors[@]}; do
-                sample_line=`cat $ncbi_log | grep "${log_line}"`
-		manifest_col=`echo $sample_line | cut -f3 -d"{" | sed "s/field_missing_error//g" | sed "s/\"//g" | sed 's/[\]//g' | sed "s/: , /,/g" | sed "s/: }//g" | sed "s/}//g"`
-		sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-9]" | sed "s/SC//" | sed "s/202[1,2]/202/" | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
+	# remove json files, move all fastq files
+	if [[ ! -d $ncbi_hold/complete ]]; then mkdir $ncbi_hold/complete; fi
+	rm $ncbi_hold/*.json
+	mv $ncbi_hold/*OH*/*fastq.gz $ncbi_hold/complete
+
+	# make sure downloads match metadata 
+	fq_num=`ls ${ncbi_hold}/complete/*.gz | wc -l`
+	meta_full_num=`cat $ncbi_metadata | wc -l`
+	meta_num=$((meta_full_num-1))
+	meta_num=$((meta_num*2))
+
+	if [[ $meta_num -eq $fq_num ]]; then
 		
-		mv ${fasta_notuploaded}/${sample_id}.* ${fasta_failed}
-		echo "$sample_id,ncbi_fail,manifest_errors:$manifest_col" >> $ncbi_results
-        done
-	
+		# rename files
+		for f in $ncbi_hold/complete/*; do
+			sample_id=`echo $f | cut -f5 -d "/" | cut -f1 -d"-"`
+			r_version=`echo $f | cut -f5 -d "/" | cut -f2 -d"R" | cut -f1 -d"_"`
+			new_name=`echo ${sample_id}_R${r_version}.fastq.gz`
+			mv $f $ncbi_hold/complete/$new_name
+		done
+
+		# move meta and attributes 
+		cp $ncbi_metadata $ncbi_hold/complete/metadata.tsv
+		cp $ncbi_attributes $ncbi_hold/complete/attributes.tsv
+
+		echo "--samples downloaded"
+	else
+		echo "The number of samples downloaded does not match the number of entries in the metadata files"
+		echo "fq is $fq_num"
+		echo "mt is $meta_num"
+		exit
+	fi	
+fi
+
+if [[ "$pipeline_sra" == "Y" ]]; then
+	echo "----RUNNING QC"
+
+	# create tmp file lists
+	## complete sample ids for project
+	## samples that were uploaded to NCBI
+	## samples that were not uploaded
+	cat $final_results | cut -f1 -d"," > tmp_full.txt
+        sed -i "s/sample_id//g" tmp_full.txt
+        sed -i '/^$/d' tmp_full.txt
+
+	cat $ncbi_hold/complete/metadata* | awk -F"\t" '{ print $6 }' > tmp_sra.txt
+        sed -i "s/SC/202/g" tmp_sra.txt
+	sed -i "s/sample_name//g" tmp_sra.txt
+        comm -23 <(sort tmp_full.txt) <(sort tmp_sra.txt) > tmp_missing.txt
+
+	# create final ncbi output 
+	awk '{print $1",NCBI_fail,NA"}' tmp_missing.txt > $ncbi_results
+	 
+	# iterate through all samples that passed
+	samples_uploaded=`cat tmp_sra.txt`
+	for sample_id in ${samples_uploaded[@]}; do
+		sra_id=`cat $ncbi_output | grep $sample_id | awk -F"\t" '{ print $1 }'`
+		echo "${sample_id},ncbi_pass,$sra_id" >> $ncbi_results
+		mv $output_dir/analysis/fasta/upload_partial/$sample_id* $output_dir/analysis/fasta/upload_complete
+	done
+
 	# merge ncbi results to final results file by sample id
-    sort $ncbi_results > tmp_gresults.txt
+    	sort $ncbi_results > tmp_nresults.txt
 	sort $final_results > tmp_fresults.txt
-	echo "sample_id,ncbi_status,ncbi_notes,pango_qc,nextclade_clade,pangolin_lineage,pangolin_scorpio,aa_substitutions" > $final_results
-	join <(sort tmp_gresults.txt) <(sort tmp_fresults.txt) -t $',' >> $final_results
-	rm tmp_fresults.txt tmp_gresults.txt
+	cp $final_results > save.txt
+	echo "sample_id,ncbi_status,ncbi_notes,gisaid_status,gisaid_notes,pango_qc,nextclade_clade,pangolin_lineage,pangolin_scorpio,aa_substitutions" > $final_results
+	join <(sort tmp_nresults.txt) <(sort tmp_fresults.txt) -t $',' >> $final_results
+	
+	#cleanup
+	rm tmp_*.txt
 
 fi

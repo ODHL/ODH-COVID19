@@ -114,6 +114,7 @@ analysis_dir=$output_dir/analysis
 
 fasta_dir=$analysis_dir/fasta
 intermed_dir=$analysis_dir/intermed
+ncbi_hold="../ncbi_hold/$project_id"
 
 #set log files
 sample_id_file=$log_dir/sample_ids.txt
@@ -766,23 +767,22 @@ elif [[ "$pipeline" == "ncbi" ]]; then
 		fasta_number=`ls "$fasta_dir/upload_partial"/ | wc -l`
 		
 		if [[ $fasta_number -gt 1 ]]; then
-			# create mput command
-			ls $analysis_dir/fasta/upload_partial | tr "\n" " " > $ncbi_mput
-
 			# run batch command
-			bash scripts/ncbi.sh "${output_dir}" "${project_id}" "${pipeline_config}" "${final_results}" "${gisaid_results}" "${reject_flag}"
-	
-			# echo the mput command
-			echo "*** COMPLETED NCBI PIPELINE ***"
-			echo
-			echo "cat $ncbi_mput"
-			echo
+			bash scripts/ncbi.sh "${output_dir}" "${project_id}" "${pipeline_config}" "${gisaid_results}" "${reject_flag}" "${final_results}"
+			
 		else
 			echo "No samples for upload"
 		fi
 	else
+		# check metadata return file is in dir
+		ncbi_sra=`ls $ncbi_hold/complete/metadata-*`
+		
 		# run batch command
-		bash scripts/ncbi.sh "${output_dir}" "${project_id}" "${pipeline_config}" "${final_results}" "${gisaid_results}" "${reject_flag}"
+		if [[ -f $ncbi_sra ]]; then
+			bash scripts/ncbi.sh "${output_dir}" "${project_id}" "${pipeline_config}" "${gisaid_results}" "${reject_flag}" "${final_results}"
+		else
+			echo "MISSING metadata output file"
+		fi
 	fi
 
 elif [[ "$pipeline" == "stats" ]]; then
@@ -795,11 +795,15 @@ elif [[ "$pipeline" == "stats" ]]; then
 
 	# number uploaded success
 	val=`cat $final_results | grep "gisaid_pass" | wc -l`
-	echo "Number uploaded successfully: $val"
+	echo "Number GISAID uploaded successfully: $val"
 
 	# number failed upload QC
         val=`cat $final_results | grep "gisaid_rejected" | wc -l`
-	echo "Number uploaded and rejected: $val"
+	echo "Number GISAID uploaded and rejected: $val"
+
+	# number passed NCBI
+	val=`cat $final_results | grep "ncbi_pass" | wc -l`
+        echo "Number NCBI uploaded: $val"
 
 	# number of samples with missing metadata
         val=`cat $final_results | grep "missing" | wc -l`
@@ -817,6 +821,6 @@ elif [[ "$pipeline" == "stats" ]]; then
 	echo "Number not processed: $val"
 	
 else
-	echo "Pipeline options (-p) must be init, run, gisaid stats, or update"
+	echo "Pipeline options (-p) must be init, run, gisaid, ncbi, stats, or update"
 fi
 

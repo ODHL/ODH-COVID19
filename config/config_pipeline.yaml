@@ -23,6 +23,9 @@ pangolin_version: "21"
 # 4 for nexstrain/nextclade:1.11.0
 nextclade_version: "4"
 
+# basespace
+basespace_cmd: "/home/jenniferh/analysis_workflow/bin/basespace"
+
 # reference files
 reference_dir: "/home/jenniferh/analysis_workflow/refs"
 reference_genome: "MN908947.3.fasta"
@@ -118,7 +121,6 @@ virus_isolate_of_prior_infection: ""
 description: ""
 
 ################ NCBI (metadata)
-filename2: ""
 filename3: ""
 filename4: ""
 assembly: ""
