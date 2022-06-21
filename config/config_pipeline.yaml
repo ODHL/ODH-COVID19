@@ -47,13 +47,23 @@ submitting_lab: "Ohio Department of Health Laboratory"
 address_submitting: "8995 East Main Street, Reynoldsburg, Ohio 43068"
 authors: "Samantha Sevilla, Jennifer Holmes, Eric Brandt, Keoni Omura, Glen McGillivary, Caitlin McDonnell, Jade Mowery, Stephanie Mccracken, Tyler Payne, Kirtana Ramadugu, Erica Leasure, Brent Lee, Kelsey Florek, Heather Blankenship, Allison Black, Quanta Brown, Tammy Bannerman"
 
-############# NCBI
+############# NCBI (attributes)
 bioproject_accession: "PRJNA701669"
-organism: "Severe actute respiratory syndrome coronavirus 2"
+organism: "Severe acute respiratory syndrome coronavirus 2"
 collected_by: "Ohio Department of Health Laboratory"
 host: "Homo sapiens"
 host_disease: "COVID-19"
-isolation_source: "clinical"
+isolation_source: "patient isolate"
+
+################ NCBI (metadata)
+design_description: "Arctic v4 primers"
+filetype: "fastq"
+instrument_model: "Illumina MiSeq"
+library_strategy: "WGS"
+library_source: "VIRAL RNA"
+library_selection: "PCR"
+library_layout: "single"
+platform: "ILLUMINA"
 
 ###############################
 # Optional
@@ -69,7 +79,7 @@ treatment: ""
 assembly_method: ""
 coverage: ""
 
-################ NCBI
+################ NCBI (attributes)
 antiviral_treatment_agent: ""
 collection_device: ""
 collection_method: ""
@@ -106,3 +116,10 @@ sequenced_by: ""
 vaccine_received: ""
 virus_isolate_of_prior_infection: ""
 description: ""
+
+################ NCBI (metadata)
+filename2: ""
+filename3: ""
+filename4: ""
+assembly: ""
+fasta_file: ""
