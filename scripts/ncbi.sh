@@ -45,7 +45,7 @@ ncbi_hold="../ncbi_hold/$project_id"
 # set files
 ncbi_attributes=$log_dir/batched_ncbi_att_${project_id}_${date_stamp}.tsv
 ncbi_metadata=$log_dir/batched_ncbi_meta_${project_id}_${date_stamp}.tsv
-ncbi_output=$ncbi_hold/complete/metadata*
+ncbi_output=$ncbi_hold/complete/*ok.tsv
 ncbi_results=$output_dir/analysis/intermed/ncbi_results.csv
 
 # set basespace command
@@ -71,8 +71,8 @@ fi
 if [[ "$pipeline_prep" == "Y" ]]; then
         echo "----PREPARING FILES"
 	# create files
-    if [[ -f $ncbi_metadata ]]; then rm $ncbi_metadata; fi
-    if [[ -f $ncbi_results ]]; then rm $ncbi_results; fi
+    	if [[ -f $ncbi_metadata ]]; then rm $ncbi_metadata; fi
+    	if [[ -f $ncbi_results ]]; then rm $ncbi_results; fi
 	touch $ncbi_results
 
     	# Create manifest for attribute upload
@@ -90,8 +90,8 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 	chunk2="library_layout\tplatform\tinstrument_model\tdesign_description\tfiletype\tfilename"
 	chunk3="filename2\tfilename3\tfilename4\tassembly\tfasta_file"
 	echo -e "${chunk1}\t${chunk2}\t${chunk3}" > $ncbi_metadata
-
-    for f in `ls -1 "$fasta_partial"`; do
+	
+	for f in `ls -1 "$fasta_partial"`; do
 		# set full file path
         	# grab header line
 		# remove header <, SC, consensus_, and .consensus_threshold_[0-9].[0-9]_quality_[0-9]
@@ -168,6 +168,7 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 fi
 
 if [[ "$pipeline_download" == "Y" ]]; then
+	echo "----DOWNLOADING SAMPLES"
 
 	# create tmp ncbi hold dir
 	if [[ ! -d $ncbi_hold ]]; then mkdir -p $ncbi_hold; fi	
@@ -175,13 +176,13 @@ if [[ "$pipeline_download" == "Y" ]]; then
 	# download fastq files for samples uploaded to gisaid	
 	for f in `ls -1 "$fasta_partial"`; do
 		download_name=`echo $f | cut -f1 -d"."`
-		$basespace_command download biosample -n ${download_name}-${project_id} -o $ncbi_hold
+		#$basespace_command download biosample -n ${download_name} -o $ncbi_hold
 	done
 
 	# remove json files, move all fastq files
 	if [[ ! -d $ncbi_hold/complete ]]; then mkdir $ncbi_hold/complete; fi
 	rm $ncbi_hold/*.json
-	mv $ncbi_hold/*OH*/*fastq.gz $ncbi_hold/complete
+	mv $ncbi_hold/*L1*/*fastq.gz $ncbi_hold/complete
 
 	# make sure downloads match metadata 
 	fq_num=`ls ${ncbi_hold}/complete/*.gz | wc -l`
@@ -223,13 +224,13 @@ if [[ "$pipeline_sra" == "Y" ]]; then
         sed -i "s/sample_id//g" tmp_full.txt
         sed -i '/^$/d' tmp_full.txt
 
-	cat $ncbi_hold/complete/metadata* | awk -F"\t" '{ print $6 }' > tmp_sra.txt
+	cat $ncbi_output | awk -F"\t" '{ print $6 }' > tmp_sra.txt
         sed -i "s/SC/202/g" tmp_sra.txt
 	sed -i "s/sample_name//g" tmp_sra.txt
         comm -23 <(sort tmp_full.txt) <(sort tmp_sra.txt) > tmp_missing.txt
 
 	# create final ncbi output 
-	awk '{print $1",NCBI_fail,NA"}' tmp_missing.txt > $ncbi_results
+	awk '{print $1",qc_fail,NA"}' tmp_missing.txt > $ncbi_results
 	 
 	# iterate through all samples that passed
 	samples_uploaded=`cat tmp_sra.txt`
@@ -242,11 +243,12 @@ if [[ "$pipeline_sra" == "Y" ]]; then
 	# merge ncbi results to final results file by sample id
     	sort $ncbi_results > tmp_nresults.txt
 	sort $final_results > tmp_fresults.txt
-	cp $final_results > save.txt
 	echo "sample_id,ncbi_status,ncbi_notes,gisaid_status,gisaid_notes,pango_qc,nextclade_clade,pangolin_lineage,pangolin_scorpio,aa_substitutions" > $final_results
 	join <(sort tmp_nresults.txt) <(sort tmp_fresults.txt) -t $',' >> $final_results
 	
 	#cleanup
 	rm tmp_*.txt
-
+	
+	# store ncbi output file
+	cp $ncbi_output $output_dir/logs
 fi
