@@ -89,12 +89,6 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 	# second line is needed for manual upload to gisaid website, but not required for CLI upload
         echo "submitter,fn,covv_virus_name,covv_type,covv_passage,covv_collection_date,covv_location,covv_add_location,covv_host,covv_add_host_info,covv_sampling_strategy,covv_gender,covv_patient_age,covv_patient_status,covv_specimen,covv_outbreak,covv_last_vaccinated,covv_treatment,covv_seq_technology,covv_assembly_method,covv_coverage,covv_orig_lab,covv_orig_lab_addr,covv_provider_sample_id,covv_subm_lab,covv_subm_lab_addr,covv_subm_sample_id,covv_authors,covv_comment,comment_type" > $batched_meta
 
-        #echo "Submitter,\"FASTA filename\",\"Virus name\",Type,\"Passage details/history\",\"Collection date\",Location,\"Additional location information\",\
-        #        Host,\"Additional host information\",\"Sampling Strategy\",Gender,\"Patient age\",\"Patient status\",\"Specimen source\",\
-        #        Outbreak,\"Last vaccinated\",Treatment,\"Sequencing technology\",\"Assembly method\",\
-        #        Coverage,\"Originating lab\",Address,\"Sample ID given by originating laboratory\",\"Submitting lab\",\
-        #        Address,\"Sample ID given by the submitting laboratory\",Authors,Comment,\"Comment Icon\"" >> $batched_meta
-
         for f in `ls -1 "$fasta_notuploaded"`; do
                 # set full file path
                 # grab header line
@@ -121,10 +115,10 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 		percent_n_calc=$(($n_num*100/$total_num))
                 if [[ "$percent_n_calc" -gt $((config_percent_n_cutoff)) ]]; then
 			short_f=`echo $f | sed "s/.consensus.fa//"`
-			echo "$short_f,gisaid_fail,qc_${percent_n_calc}%_Ns" >> $gisaid_results
+			echo "$short_f,qc_fail,qc_${percent_n_calc}%_Ns" >> $gisaid_results
                         mv "$full_path" "$fasta_failed"/"${sample_id}.fa"
                 else
-                        #find associated metadata
+			#find associated metadata
                         meta=`cat "$log_dir/${config_metadata_file}" | grep "$sample_id"`
                         
 			#if meta is found create input metadata row
@@ -197,7 +191,7 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 
                         else
                                 # add sample to results, move associated files
-                                echo "$sample_id,gisaid_fail,qc_missing_metadata" >> $gisaid_results
+                                echo "$sample_id,qc_fail,qc_missing_metadata" >> $gisaid_results
                                 mv "$full_path" "$fasta_failed"/${sample_id}.fa
                         fi
                 fi
@@ -256,7 +250,10 @@ if [[ "$pipeline_qc" == "Y" ]]; then
         done
 	
 	# merge gisaid results to final results file by sample id
-        sort $gisaid_results > tmp_gresults.txt
+        sed -i "s/>Consensus_//g" $gisaid_results
+	sed -i "s/\.fa//g" $gisaid_results
+
+	sort $gisaid_results > tmp_gresults.txt
 	sort $final_results > tmp_fresults.txt
 	echo "sample_id,gisaid_status,gisaid_notes,pango_qc,nextclade_clade,pangolin_lineage,pangolin_scorpio,aa_substitutions" > $final_results
 	join <(sort tmp_gresults.txt) <(sort tmp_fresults.txt) -t $',' >> $final_results

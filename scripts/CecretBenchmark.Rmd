@@ -1,0 +1,110 @@
+---
+title: "CECRET Benchmarking"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r echo=FALSE, include=FALSE}
+library(ggplot2)
+```
+
+```{r echo=FALSE, include=FALSE}
+#Import data
+project_log=read.csv('project_log.txt',sep="\t")
+```
+
+```{r echo=FALSE, include=FALSE}
+## for user
+project_log["User_time"]=project_log["Deploy"]+project_log["Transfer"]
+
+## total time
+project_log["total_time"]=project_log["User_time"]+project_log["Workflow"]
+
+## time / sample
+project_log["sample_time"]=project_log["N_Samples"]/project_log["total_time"]
+
+
+## complete cases
+project_log=subset(project_log,total_time>0)
+
+# Chr max
+project_log$n_samples_per_batch=as.character(project_log$Max)
+```
+
+Plot distribution of time
+```{r echo=FALSE}
+tmp_df=data.frame()
+#create graphics
+for (rowid in rownames(project_log)){
+  tmp_df[nrow(tmp_df)+1,"type"]="user_time"
+  tmp_df[nrow(tmp_df),"total_time"]=project_log[rowid,"User_time"]
+  tmp_df[nrow(tmp_df),"Project"]=project_log[rowid,"Project"]
+  
+  
+  tmp_df[nrow(tmp_df)+1,"type"]="workflow_time"
+  tmp_df[nrow(tmp_df),"total_time"]=project_log[rowid,"Workflow"]
+  tmp_df[nrow(tmp_df),"Project"]=project_log[rowid,"Project"]
+}
+ggplot(tmp_df, aes(fill=type, y=Project, x=total_time)) + 
+    geom_bar(position="stack", stat="identity")
+```
+
+If the number of samples was the only factor impacting time, we would see an increase in samples / time. This is not the case on either instrument.
+```{r echo=FALSE}
+#create graphics
+graph_time<-function(df_in, x_in){
+  df_in=df_in[complete.cases(df_in[,x_in]),]
+  
+  ggplot(data=df_in, aes(x=get(x_in), y=sample_time,group=Instrument, shape=n_samples_per_batch)) +
+    geom_line(aes(color=Instrument))+
+    geom_point(aes(color=Instrument), size=6)+
+    xlab(x_in) +
+    ggtitle(paste0("Plot of total time by ", x_in))
+}
+graph_time(project_log,"N_Samples")
+graph_time(project_log,"AvePairs")
+graph_time(project_log,"N_Batches")
+graph_time(project_log,"Max")
+
+```
+
+Plot total time by factors
+```{r echo=FALSE}
+#create graphics
+graph_time<-function(df_in, x_in){
+  df_in=df_in[complete.cases(df_in[,x_in]),]
+  
+  ggplot(data=df_in, aes(x=get(x_in), y=sample_time,group=Instrument, shape=n_samples_per_batch)) +
+    geom_line(aes(color=Instrument))+
+    geom_point(aes(color=Instrument), size=6)+
+    xlab(x_in) +
+    ggtitle(paste0("Plot of total time by ", x_in))
+}
+graph_time(project_log,"N_Samples")
+graph_time(project_log,"AvePairs")
+graph_time(project_log,"N_Batches")
+graph_time(project_log,"Max")
+
+```
+
+Plot sample time by maximum numbers per batch
+```{r}
+#create graphics
+graph_time<-function(df_in, x_in){
+  df_in=df_in[complete.cases(df_in[,x_in]),]
+  df_in["time_per_sample"]=df_in[,"total_time"]/df_in[,x_in]
+  
+  p = ggplot(data=df_in, aes(x=get(x_in), y=time_per_sample,group=1, shape=Instrument)) +
+    geom_line(color="red")+
+    geom_point(size = 6) +  
+    geom_point() +
+    xlab(x_in) +
+    ylab("total time  (min)")
+    ggtitle(paste0("Plot of time per sample\nVaried by max samples per batch"))
+  print(p)
+}
+graph_time(project_log,"Max")
+
+```
+
