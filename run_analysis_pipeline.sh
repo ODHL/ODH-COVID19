@@ -42,21 +42,8 @@ check_initialization(){
   fi
 }
 
-parse_yaml() {
-   local prefix=$2
-   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
-   sed -ne "s|^\($s\)\($w\)$s:$s\"\(.*\)\"$s\$|\1$fs\2$fs\3|p" \
-        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
-   awk -F$fs '{
-      indent = length($1)/2;
-      vname[indent] = $2;
-      for (i in vname) {if (i > indent) {delete vname[i]}}
-      if (length($3) > 0) {
-         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
-         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
-      }
-   }'
-}
+# source global functions
+source $(dirname "$0")/scripts/functions.sh
 
 #############################################################################################
 # helper function
@@ -132,6 +119,7 @@ final_results=$analysis_dir/final_results_$date_stamp.csv
 #############################################################################################
 if [[ "$pipeline" == "init" ]]; then
 	
+	# print message
 	echo
 	echo "*** INITIALIZING PIPELINE ***"
 
@@ -181,28 +169,24 @@ if [[ "$pipeline" == "init" ]]; then
 elif [[ "$pipeline" == "update" ]]; then
 
         #update the staphb toolkit
-        staphb-wf --auto_update
+        staphb-tk --auto_update
 
 elif [[ "$pipeline" == "cecret" ]]; then
 	
 	#############################################################################################
-    # Run CECRET pipeline
-    #############################################################################################
-    echo "------------------------------------------------------------------------"
-    echo "------------------------------------------------------------------------" >> $pipeline_log
-   	echo "*** STARTING CECRET PIPELINE ***" >> $pipeline_log
-    echo "*** STARTING CECRET PIPELINE ***"
+    	# Run CECRET pipeline
+    	#############################################################################################
+   	message_cmd_log "------------------------------------------------------------------------"
+    	message_cmd_log "-- STARTING CECRET PIPELINE ---"
 
 	# check initialization was completed
 	check_initialization
 	
-    # Eval YAML args
-	eval $(parse_yaml ${pipeline_config} "config_")
-	metadata_file="$log_dir/$config_metadata_file"
+    	# Eval YAML args
 	date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
 
-    # run pipelien
-	bash scripts/ncbi.sh \
+    	# run pipelien
+	bash scripts/cecret.sh \
 		"${output_dir}" \
 		"${project_name_full}" \
 		"${pipeline_config}" \
@@ -214,20 +198,24 @@ elif [[ "$pipeline" == "cecret" ]]; then
 		"${partial_flag}"
 		
 	# run QC
-	## TODO decouple gisaid QC
+	bash scripts/seq_qc.sh \
+		"${output_dir}" \
+		"${pipeline_config}"
 
 elif [[ "$pipeline" == "gisaid" ]]; then
-        #############################################################################################
+	#########################################################
+	# Eval, source
+	#########################################################
+	eval $(parse_yaml ${pipeline_config} "config_")
+
+	############################################################################################
         # Run GISAID UPLOAD
         #############################################################################################
 	if [[ $reject_flag == "N" ]]; then
-		echo "------------------------------------------------------------------------"
-	        echo "------------------------------------------------------------------------" >> $pipeline_log
-        	echo "*** STARTING GISAID PIPELINE ***" >> $pipeline_log
-        	echo "*** STARTING GISAID PIPELINE ***"
+		message_cmd_log "------------------------------------------------------------------------"
+		message_cmd_log "--- STARTING GISAID PIPELINE ---"
 
         	# Eval YAML args
-	        eval $(parse_yaml ${pipeline_config} "config_")
         	metadata_file="$log_dir/$config_metadata_file"
 
 		# determine number of samples
@@ -310,19 +298,20 @@ elif [[ "$pipeline" == "gisaid" ]]; then
 
 	fi
 
-	echo "*** GISAID PIPELINE COMPLETE ***"
-	echo "*** GISAID PIPELINE COMPLETE ***" >> $pipeline_log
-	echo "------------------------------------------------------------------------"
-       	echo "------------------------------------------------------------------------" >> $pipeline_log
+	message_cmd_log "--- GISAID PIPELINE COMPLETE ---"
+	message_cmd_log "------------------------------------------------------------------------"
 elif [[ "$pipeline" == "ncbi" ]]; then
 	
+        ##########################################################
+        # Eval, source
+        #########################################################
+	eval $(parse_yaml ${pipeline_config} "config_")
+
 	#############################################################################################
         # Run NCBI UPLOAD
         #############################################################################################
-       	echo "------------------------------------------------------------------------"
-        echo "------------------------------------------------------------------------" >> $pipeline_log
-       	echo "*** STARTING NCBI PIPELINE ***" >> $pipeline_log
-        echo "*** STARTING NCBI PIPELINE ***"
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--- STARTING NCBI PIPELINE ---"
 
 	# set args
 	date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
@@ -330,7 +319,6 @@ elif [[ "$pipeline" == "ncbi" ]]; then
 	gisaid_results=$analysis_dir/intermed/gisaid_results.csv
 
         # Eval YAML args
-	eval $(parse_yaml ${pipeline_config} "config_")
 	metadata_file="$log_dir/$config_metadata_file"
 
         # run inital upload or merge results
@@ -346,8 +334,28 @@ elif [[ "$pipeline" == "ncbi" ]]; then
 			echo "No samples for upload"
 		fi
 	else
-		# check metadata return file is in dir
-		ncbi_sra=`ls $ncbi_hold/complete/metadata-*`
+		# merge multiple NCBI outputs
+		header="header.txt"
+		joined="joined.txt"
+		cleaned="cleaned.txt"
+		final="metadata-processed-ok.tsv"
+		for f in $ncbi_hold/complete/metadata*ok*; do
+			if [[ ! -f $header ]]; then head -n1 $f > $header; fi
+    			if [[ ! -f $joined ]]; then touch $joined; fi
+    			cat $f >> $joined
+			
+			# rename the file
+			new_name=`echo $f | sed "s/-processed-ok//g"`
+    			mv $f $new_name
+		done
+
+		cat $header > $ncbi_hold/complete/$final
+		grep -v "accession" $joined > $cleaned
+		cat $cleaned | sort | uniq >> $ncbi_hold/complete/$final
+		rm $header $joined $cleaned
+
+   		# check metadata return file is in dir
+		ncbi_sra=`ls $ncbi_hold/complete/*ok*`
 		
 		# run batch command
 		if [[ -f $ncbi_sra ]]; then
@@ -360,43 +368,96 @@ elif [[ "$pipeline" == "ncbi" ]]; then
 		fi
 	fi
 
+	# complete
+	message_cmd_log "--- COMPLETED NCBI PIPELINE ---"
+
 elif [[ "$pipeline" == "stats" ]]; then
-	echo "*** RUNNING PIPELINE STATS ***"
-        # total number
+        
+	# create stats file
+	stats_log=$log_dir/stats.txt
+	touch $stats_log
+
+	################ General
+	message_stats_log "*** RUNNING PIPELINE STATS ***"
+	
+	# total number
         val=`ls ${output_dir}/analysis/fasta/*/*.fa | wc -l`
-        echo "--Total number of samples $val"
-
+	message_stats_log "--Total number of samples $val"
+	
 	# number failed pipeline qC
-	val=`cat $final_results | grep "qc_fail" | wc -l`
-	echo "----Number failed pipeline QC: $val"
-
-	echo "-- GISAID STATS"
-	# number uploaded success
-	val=`cat $final_results | grep "gisaid_pass" | wc -l`
-	echo "---- Number GISAID uploaded successfully: $val"
-
-	# number failed upload QC
-        val=`cat $final_results | grep "gisaid_rejected" | wc -l`
-	echo "---- Number GISAID uploaded and rejected: $val"
+	val1=`cat $final_results | grep "qc_fail" | grep -v "missing_metadata" | grep -v "gisaid_rejected" | grep -v "gisaid_fail" |  wc -l`
+	message_stats_log "----Number failed pipeline QC: $val1"
 
 	# number of samples with missing metadata
-        val=`cat $final_results | grep "missing" | wc -l`
-        echo "---- Number missing metadata: $val"
-	if [[ $val -gt 0 ]]; then 
-		cat $intermed_dir/gisaid_results.csv | grep "missing" >> ../missing_metadata.csv
-		sed -i "s/gisaid_fail/$project_id/g" ../missing_metadata.csv
-		cat $intermed_dir/gisaid_results.csv | uniq > tmp.csv
-		mv tmp.csv > ../missing_metadata.csv
-		rm tmp.csv
-	fi
+        val2=`cat $final_results | grep "missing" | wc -l`
+        message_stats_log "----Number missing metadata: $val2"
+        if [[ $val2 -gt 0 ]]; then
+               cat $intermed_dir/gisaid_results.csv | grep "missing" > $log_dir/missing_metadata.csv
+               sed -i "s/gisaid_fail/$project_id/g" $log_dir/missing_metadata.csv
+        fi
+	
+	val=$((val-val1-val2))
+        message_stats_log "----Number pased pipeline QC: $val"
 
-	echo "-- NCBI Results"
+	################# GISAID
+	message_stats_log "-- GISAID STATS"
+	# number uploaded success
+	val=`cat $final_results | grep "gisaid_pass" | wc -l`
+	message_stats_log "---- Number GISAID uploaded successfully: $val"
+
+	# number failed upload
+        val=`cat $final_results | grep -e "gisaid_fail" -e "gisaid_rejected" | wc -l`
+	message_stats_log "---- Number GISAID uploaded and rejected: $val"
+	
+	################## NCBI
+	message_stats_log "-- NCBI Results"
         # number passed upload
         val=`cat $final_results | grep "ncbi_pass" | wc -l`
-        echo "---- Number NCBI uploaded: $val"
+        message_stats_log "---- Number NCBI uploaded: $val"
 
+        # number passed upload
+        val=`cat $final_results | grep "ncbi_duplicated" | wc -l`
+        message_stats_log "---- Number NCBI duplicated: $val"
+
+	message_stats_log "*** COMPLETE PIPELINE ***"
+elif [[ "$pipeline" == "cleanup" ]]; then
+	project_id=$project_name
+	project_date=$date_stamp
 	
+	cd ..
+	if [[ $reject_flag == "Y" ]]; then
+		for f in $project_id/analysis/intermed/*; do sed -i "s/-${project_id}//g" $f; done
+		ncbi_results="$project_id/analysis/intermed/ncbi_results.csv"
+		final_results="$project_id/analysis/final_results_$project_date.csv"
+		final_cecret="$project_id/analysis/intermed/final_cecret.txt"
+		final_nextclade="$project_id/analysis/intermed/final_nextclade.txt"
+		sed -i "s/>Consensus_//g" $project_id/analysis/intermed/gisaid_results.csv
+		sed -i "s/\.fa//g" $project_id/analysis/intermed/gisaid_results.csv
+		sed -i "s/gisaid_fail,qc/qc_fail,qc/g" $project_id/analysis/intermed/gisaid_results.csv
+		echo "sample_id,pango_qc,nextclade_clade,pangolin_lineage,pangolin_scorpio,aa_substitutions" > $final_results
+		join <(sort $final_cecret) <(sort $final_nextclade) -t $',' >> $final_results
+		sort $project_id/analysis/intermed/gisaid_results.csv > tmp_gresults.txt
+		sort $project_id/analysis/final_results_$project_date.csv > tmp_fresults.txt
+		echo "sample_id,gisaid_status,gisaid_notes,pango_qc,nextclade_clade,pangolin_lineage,pangolin_scorpio,aa_substitutions" > "$final_results"
+		join <(sort tmp_gresults.txt) <(sort tmp_fresults.txt) -t $',' >> "$final_results"
+		cat $ncbi_results | grep -v "fail" > tmp_nresults.txt
+		cat $final_results | grep "fail" | awk -F"," '{print $1,$2,"NA"}'| sed -s "s/ /,/g" | sed -s "s/gisaid_fail/qc_fail/g" >> tmp_nresults.txt
+		sort $final_results > tmp_fresults.txt
+		echo "sample_id,ncbi_status,ncbi_notes,gisaid_status,gisaid_notes,pango_qc,nextclade_clade,pangolin_lineage,pangolin_scorpio,aa_substitutions" > $final_results
+		join <(sort tmp_nresults.txt) <(sort tmp_fresults.txt) -t $',' >> $final_results
+	fi
+
+	# zip fasta folder
+	if [[ ! -f $project_id/analysis/fasta.tar.gz ]]; then tar -zcvf $project_id/analysis/fasta.tar.gz $project_id/analysis/fasta; fi
+
+	# remove ncbi_hold dir
+	rm -r ncbi_hold/$project_id
+
+	# return to dir
+	cd analysis*
+	bash run_analysis_pipeline.sh -m stats -n $project_id
+
 else
-	echo "Pipeline options (-p) must be init, run, gisaid, ncbi, stats, or update"
+	echo "Pipeline options (-p) must be init, cecret, gisaid, ncbi, stats, update or cleanup"
 fi
 

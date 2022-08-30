@@ -25,7 +25,12 @@ pangolin_version: "22"
 # 5 for nextstrain/nextclade:2.4.0
 nextclade_version: "5"
 
-# basespace
+# staphb version
+# 1 for 3.10
+# 2 for 2.0
+cecret_version: "2"
+
+# cmds
 basespace_cmd: "/home/jenniferh/analysis_workflow/bin/basespace"
 
 # reference files
