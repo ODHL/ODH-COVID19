@@ -153,6 +153,7 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 
                                 # Calculate the person's age in either years or months based on today's date
                                 #e.g.  65 or 7 months, or unknown
+				# dates must be with "/"
                                 raw_dob=`echo $meta | awk -F',' '{print $2}'`
                                 patient_yr=`echo "${raw_dob}" | awk '{split($0,a,"/"); print a[3]}' | sed 's/^0*//' | tr -d '"'`
                                 patient_mn=`echo "${raw_dob}" | awk '{split($0,a,"/"); print a[1]}' | sed 's/^0*//' | tr -d '"'`

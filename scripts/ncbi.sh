@@ -98,8 +98,8 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 		#if header has a / then rearraign, otherwise use header
 		full_path="$fasta_partial"/$f
 		full_header=`cat "$full_path" | grep ">"`
-		sample_id=`echo $full_header | awk '{ gsub(">", "")  gsub("SC", "") gsub("Consensus_","") \
-		gsub("[.]consensus_threshold_[0-9].[0-9]_quality_[0-9].*","") gsub(" ","") gsub(".consensus.fa",""); print $0}'`
+		sample_id=`echo $full_header | cut -f1 -d"-" | awk '{ gsub(">", "")  gsub("SC", "") gsub("Consensus_","") \
+			gsub("[.]consensus_threshold_[0-9].[0-9]_quality_[0-9].*","") gsub(" ","") gsub(".consensus.fa","") gsub(".fa",""); print $0}'`
                 
 		#find associated metadata
 		meta=`cat "$log_dir/${config_metadata_file}" | grep "$sample_id"`
@@ -163,7 +163,9 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 
 			#add output variables to attributes file
                         echo -e "${chunk1}\t${chunk2}\t${chunk3}" >> $ncbi_metadata
-            fi
+	    else
+	    	echo "Missing metadata $f"
+	    fi
         done
 fi
 
@@ -176,13 +178,15 @@ if [[ "$pipeline_download" == "Y" ]]; then
 	# download fastq files for samples uploaded to gisaid	
 	for f in `ls -1 "$fasta_partial"`; do
 		download_name=`echo $f | cut -f1 -d"."`
-		#$basespace_command download biosample -n ${download_name} -o $ncbi_hold
+		#$basespace_command download biosample -n ${download_name}-${project_id} -o $ncbi_hold
+	        $basespace_command download biosample -n ${download_name} -o $ncbi_hold
 	done
 
 	# remove json files, move all fastq files
 	if [[ ! -d $ncbi_hold/complete ]]; then mkdir $ncbi_hold/complete; fi
 	rm $ncbi_hold/*.json
-	mv $ncbi_hold/*L1*/*fastq.gz $ncbi_hold/complete
+	mv $ncbi_hold/*L*/*fastq.gz $ncbi_hold/complete
+	rm -r $ncbi_hold/2*
 
 	# make sure downloads match metadata 
 	fq_num=`ls ${ncbi_hold}/complete/*.gz | wc -l`
