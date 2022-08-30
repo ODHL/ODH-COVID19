@@ -13,7 +13,8 @@ batch_limit: "55"
 # 19 for 3.1.19-pangolearn-2022-01-20
 # 20 for 3.1.20-pangolearn-2022-02-02
 # 21 for 3.1.20-pangoLearn-2022-02-28
-pangolin_version: "21"
+# 22 for 4.1.2-pdata-1.13
+pangolin_version: "22"
 
 # nextclade version
 # to check versions available to go: https://hub.docker.com/r/nextstrain/nextclade/tags
@@ -21,7 +22,8 @@ pangolin_version: "21"
 # 2 for nextstrain/nextclade:1.10.2
 # 3 for nextstrain/nextclade:1.10.3
 # 4 for nexstrain/nextclade:1.11.0
-nextclade_version: "4"
+# 5 for nextstrain/nextclade:2.4.0
+nextclade_version: "5"
 
 # basespace
 basespace_cmd: "/home/jenniferh/analysis_workflow/bin/basespace"
