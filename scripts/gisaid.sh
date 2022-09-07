@@ -6,32 +6,16 @@ project_id=$2
 pipeline_config=$3
 final_results=$4
 reject_flag=$5
-#########################################################
-# functions
-#########################################################
-parse_yaml() {
-   local prefix=$2
-   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
-   sed -ne "s|^\($s\)\($w\)$s:$s\"\(.*\)\"$s\$|\1$fs\2$fs\3|p" \
-        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
-   awk -F$fs '{
-      indent = length($1)/2;
-      vname[indent] = $2;
-      for (i in vname) {if (i > indent) {delete vname[i]}}
-      if (length($3) > 0) {
-         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
-         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
-      }
-   }'
-}
 
+#########################################################
+# Eval, source
+#########################################################
+source $(dirname "$0")/functions.sh
+eval $(parse_yaml ${pipeline_config} "config_")
 
 #########################################################
 # Set dirs, files, args
 #########################################################
-# read in config
-eval $(parse_yaml ${pipeline_config} "config_")
-
 # set date
 date_stamp=`date '+%Y_%m_%d'`
 
@@ -85,6 +69,17 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 	touch $gisaid_results
 	touch $gisaid_log
 
+	# remove projectID from with fastq files, file names
+	for f in ../$project_id/analysis/fasta/not_uploaded/*; do 
+		sed -i "s/-${project_id}//g" $f
+		new_name=`echo $f | cut -f6 -d"/" | cut -f1 -d"-"`
+		mv $f ../$project_id/analysis/fasta/not_uploaded/$new_name.fa
+	done
+
+	# remove projectID from intermed files, final file
+	for f in ../$project_id/analysis/intermed/*; do sed -i "s/-${project_id}//g" $f; done
+	sed -i "s/-${project_id}//g" ../$project_id/analysis/final*
+	
         # Create manifest for upload
 	# second line is needed for manual upload to gisaid website, but not required for CLI upload
         echo "submitter,fn,covv_virus_name,covv_type,covv_passage,covv_collection_date,covv_location,covv_add_location,covv_host,covv_add_host_info,covv_sampling_strategy,covv_gender,covv_patient_age,covv_patient_status,covv_specimen,covv_outbreak,covv_last_vaccinated,covv_treatment,covv_seq_technology,covv_assembly_method,covv_coverage,covv_orig_lab,covv_orig_lab_addr,covv_provider_sample_id,covv_subm_lab,covv_subm_lab_addr,covv_subm_sample_id,covv_authors,covv_comment,comment_type" > $batched_meta
@@ -97,7 +92,7 @@ if [[ "$pipeline_prep" == "Y" ]]; then
                 full_path="$fasta_notuploaded"/$f
                 full_header=`cat "$full_path" | grep ">"`
                 sample_id=`echo $full_header | awk '{ gsub(">", "")  gsub("SC", "") gsub("Consensus_","") \
-			gsub("[.]consensus_threshold_[0-9].[0-9]_quality_[0-9].*","") gsub(" ","") gsub(".consensus.fa",""); print $0}'`
+			gsub("[.]consensus_threshold_[0-9].[0-9]_quality_[0-9].*","") gsub(" ","") gsub(".consensus.fa","") gsub(".fa",""); print $0}'`
                 
 		# determine total number of seq
                 # if the file is empty, set equal to 1
@@ -256,7 +251,7 @@ if [[ "$pipeline_qc" == "Y" ]]; then
 
 	sort $gisaid_results > tmp_gresults.txt
 	sort $final_results > tmp_fresults.txt
-	echo "sample_id,gisaid_status,gisaid_notes,pango_qc,nextclade_clade,pangolin_lineage,pangolin_scorpio,aa_substitutions" > $final_results
+	echo "sample_id,gisaid_status,gisaid_notes,sample_id,pango_status,pangolin_lineage,pangolin_scorpio,pangolin_version,nextclade_clade,aa_substitutions" > $final_results
 	join <(sort tmp_gresults.txt) <(sort tmp_fresults.txt) -t $',' >> $final_results
 	rm tmp_fresults.txt tmp_gresults.txt
 
