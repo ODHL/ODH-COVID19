@@ -12,6 +12,8 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     fxn()
 
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 #fragment length text file
 frag_file=sys.argv[1]
 
