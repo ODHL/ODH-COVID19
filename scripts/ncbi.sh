@@ -9,36 +9,21 @@ reject_flag=$5
 final_results=$6
 
 #########################################################
-# functions
+# Eval, source
 #########################################################
-parse_yaml() {
-   local prefix=$2
-   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
-   sed -ne "s|^\($s\)\($w\)$s:$s\"\(.*\)\"$s\$|\1$fs\2$fs\3|p" \
-        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
-   awk -F$fs '{
-      indent = length($1)/2;
-      vname[indent] = $2;
-      for (i in vname) {if (i > indent) {delete vname[i]}}
-      if (length($3) > 0) {
-         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
-         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
-      }
-   }'
-}
+source $(dirname "$0")/functions.sh
+eval $(parse_yaml ${pipeline_config} "config_")
 
 #########################################################
 # Set dirs, files, args
 #########################################################
-# read in config
-eval $(parse_yaml ${pipeline_config} "config_")
-
 # set date
 date_stamp=`date '+%Y_%m_%d'`
 
 # set dirs
 fasta_partial=$output_dir/analysis/fasta/upload_partial
 fasta_uploaded=$output_dir/analysis/fasta/upload_complete
+fasta_failed=$output_dir/analysis/fasta/upload_failed
 log_dir=$output_dir/logs
 ncbi_hold="../ncbi_hold/$project_id"
 
@@ -47,6 +32,7 @@ ncbi_attributes=$log_dir/batched_ncbi_att_${project_id}_${date_stamp}.tsv
 ncbi_metadata=$log_dir/batched_ncbi_meta_${project_id}_${date_stamp}.tsv
 ncbi_output=$ncbi_hold/complete/*ok.tsv
 ncbi_results=$output_dir/analysis/intermed/ncbi_results.csv
+ncbi_failed=$ncbi_hold/complete/NCBI_failed.txt
 
 # set basespace command
 basespace_command=${config_basespace_cmd}
@@ -58,10 +44,12 @@ basespace_command=${config_basespace_cmd}
 if [[ $reject_flag == "N" ]]; then
 	pipeline_prep="Y"
 	pipeline_download="Y"
+	pipeline_split="Y"
 	pipeline_sra="N"
 else
 	pipeline_prep="N"
 	pipeline_download="N"
+	pipeline_split="N"
 	pipeline_sra="Y"
 fi
 
@@ -136,7 +124,15 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 
 			# set remaining variables
 			sc_id=`echo $virus_name | cut -f4 -d"-" | cut -f1 -d"/"`
-			gisaid_accession=`cat $gisaid_results | grep $sample_id | cut -f3 -d","`
+			gisaid_accession=`cat $gisaid_results | grep $sample_id | cut -f3 -d"," | grep -v "qc_missing_metadata"`
+			
+			# if gisaid is a duplicate, mv fasta to failed and skip
+			SUB="duplicated"
+			if [[ "$gisaid_accession" == *"$SUB"* ]]; then
+				mv $full_path $fasta_failed
+				next
+			fi
+
 			sample_title=`echo "${config_library_strategy} of ${config_organism}: ${config_isolation_source}"`
 
 			# break output into chunks
@@ -178,22 +174,31 @@ if [[ "$pipeline_download" == "Y" ]]; then
 	# download fastq files for samples uploaded to gisaid	
 	for f in `ls -1 "$fasta_partial"`; do
 		download_name=`echo $f | cut -f1 -d"."`
+		$basespace_command download biosample -n ${download_name}-OH-M2941-220613 -o $ncbi_hold
 		#$basespace_command download biosample -n ${download_name}-${project_id} -o $ncbi_hold
-	        $basespace_command download biosample -n ${download_name} -o $ncbi_hold
+	        #$basespace_command download biosample -n ${download_name} -o $ncbi_hold
 	done
 
 	# remove json files, move all fastq files
 	if [[ ! -d $ncbi_hold/complete ]]; then mkdir $ncbi_hold/complete; fi
 	rm $ncbi_hold/*.json
-	mv $ncbi_hold/*L*/*fastq.gz $ncbi_hold/complete
+
+	#mv $ncbi_hold/*L*/*fastq.gz $ncbi_hold/complete
+        mv $ncbi_hold/*/*fastq.gz $ncbi_hold/complete
+	
 	rm -r $ncbi_hold/2*
+
+	# rename files in complete
+	for f in $ncbi_hold/complete; do
+		new_name=`echo $f | sed -s "s/S[0-9]*_L001_//g" | sed -s "s/_001.fastq.gz_R[1-2]//g"`
+		mv $f $new_name
+	done
 
 	# make sure downloads match metadata 
 	fq_num=`ls ${ncbi_hold}/complete/*.gz | wc -l`
 	meta_full_num=`cat $ncbi_metadata | wc -l`
 	meta_num=$((meta_full_num-1))
 	meta_num=$((meta_num*2))
-
 	if [[ $meta_num -eq $fq_num ]]; then
 		
 		# rename files
@@ -214,27 +219,88 @@ if [[ "$pipeline_download" == "Y" ]]; then
 		echo "fq is $fq_num"
 		echo "mt is $meta_num"
 		exit
-	fi	
+	fi
+fi
+
+if [[ "$pipeline_split" == "Y" ]]; then
+	# make sure downloads match metadata
+        fq_num=`ls ${ncbi_hold}/complete/*.gz | wc -l`
+	# if the count is higher than 150 samples then split into two
+	if [[ $fq_num -gt 150 ]]; then
+		# first part
+		pt=$ncbi_hold/complete/pt1
+		if [[ ! -d $pt ]]; then mkdir $pt; fi
+		sed -n -e '1,76p' $ncbi_hold/complete/metadata.tsv > $pt/metadata.tsv
+		sed -n -e '1,76p' $ncbi_hold/complete/attributes.tsv > $pt/attributes.tsv
+		mv `ls $ncbi_hold/complete/*fastq.gz | head -150` $pt
+
+		if [[ $fq_num -gt 300 ]]; then
+			# second part
+			pt=$ncbi_hold/complete/pt2
+			if [[ ! -d $pt ]]; then mkdir $pt; fi
+			sed -n -e 1p -e '77,151p' $ncbi_hold/complete/metadata.tsv > $pt/metadata.tsv
+                	sed -n -e 1p -e '77,151p' $ncbi_hold/complete/attributes.tsv > $pt/attributes.tsv
+	                mv `ls $ncbi_hold/complete/*fastq.gz | head -150` $pt
+
+			if [[ $fq_num -gt 400 ]]; then
+				# third part
+                        	pt=$ncbi_hold/complete/pt3
+              	        	if [[ ! -d $pt ]]; then mkdir $pt; fi
+                        	sed -n -e 1p -e '152,301p' $ncbi_hold/complete/metadata.tsv > $pt/metadata.tsv
+                        	sed -n -e 1p -e '152,301p' $ncbi_hold/complete/attributes.tsv > $pt/attributes.tsv
+		                mv `ls $ncbi_hold/complete/*fastq.gz | head -150` $pt
+
+                                # fourth part
+                                pt=$ncbi_hold/complete/pt4
+                                if [[ ! -d $pt ]]; then mkdir $pt; fi
+                                sed -n -e 1p -e '302,$p' $ncbi_hold/complete/metadata.tsv > $pt/metadata.tsv
+                                sed -n -e 1p -e '302,$p' $ncbi_hold/complete/attributes.tsv > $pt/attributes.tsv
+                                mv $ncbi_hold/complete/*fastq.gz $pt
+			else
+                                # third part
+                                pt=$ncbi_hold/complete/pt3
+                                if [[ ! -d $pt ]]; then mkdir $pt; fi
+                                sed -n -e 1p -e '152,$p' $ncbi_hold/complete/metadata.tsv > $pt/metadata.tsv
+                                sed -n -e 1p -e '152,$p' $ncbi_hold/complete/attributes.tsv > $pt/attributes.tsv
+                                mv $ncbi_hold/complete/*fastq.gz $pt
+			fi
+		else
+		        # second part
+                        pt=$ncbi_hold/complete/pt2
+                        if [[ ! -d $pt ]]; then mkdir $pt; fi
+                        sed -n -e 1p -e '77,$p' $ncbi_hold/complete/metadata.tsv > $pt/metadata.tsv
+                        sed -n -e 1p -e '77,$p' $ncbi_hold/complete/attributes.tsv > $pt/attributes.tsv
+                        mv $ncbi_hold/complete/*fastq.gz $pt
+		fi
+	fi
 fi
 
 if [[ "$pipeline_sra" == "Y" ]]; then
 	echo "----RUNNING QC"
 
-	# create tmp file lists
-	## complete sample ids for project
-	## samples that were uploaded to NCBI
-	## samples that were not uploaded
+	#create list of sample ids
 	cat $final_results | cut -f1 -d"," > tmp_full.txt
         sed -i "s/sample_id//g" tmp_full.txt
         sed -i '/^$/d' tmp_full.txt
 
+	# create list of samples uploaded to ncbi
 	cat $ncbi_output | awk -F"\t" '{ print $6 }' > tmp_sra.txt
         sed -i "s/SC/202/g" tmp_sra.txt
 	sed -i "s/sample_name//g" tmp_sra.txt
-        comm -23 <(sort tmp_full.txt) <(sort tmp_sra.txt) > tmp_missing.txt
+        
+	# create list of samples duplicated to ncbi
+	if [[ ! -f $ncbi_failed ]]; then touch $ncbi_failed; fi
+	cat $ncbi_failed | awk -F"\t" '{ print $1 }' > tmp_fail.txt
+        sed -i "s/SC/202/g" tmp_fail.txt
+        sed -i "s/Sample name//g" tmp_fail.txt
+	sed -i '/^$/d' tmp_fail.txt
+
+	# create list of samples that were not uploaded or duplicated
+	comm -23 <(sort tmp_full.txt) <(sort tmp_sra.txt) > tmp_missing_1.txt
+	comm -23 <(sort tmp_missing_1.txt) <(sort tmp_fail.txt) > tmp_missing_2.txt
 
 	# create final ncbi output 
-	awk '{print $1",qc_fail,NA"}' tmp_missing.txt > $ncbi_results
+	awk '{print $1",qc_fail,NA"}' tmp_missing_2.txt > $ncbi_results
 	 
 	# iterate through all samples that passed
 	samples_uploaded=`cat tmp_sra.txt`
@@ -244,15 +310,31 @@ if [[ "$pipeline_sra" == "Y" ]]; then
 		mv $output_dir/analysis/fasta/upload_partial/$sample_id* $output_dir/analysis/fasta/upload_complete
 	done
 
+	# iterate through all samples that were duplicated
+	samples_failed=`cat tmp_fail.txt`
+	for sample_id in ${samples_failed[@]}; do
+		sc_id=`echo $sample_id | sed -s "s/202/SC/g"`
+		sra_id=`cat $ncbi_failed | grep $sc_id | awk -F"\t" '{ print $2 }'`
+                echo $sra_id
+		echo "${sample_id},ncbi_duplicated,$sra_id" >> $ncbi_results
+		
+                mv $output_dir/analysis/fasta/upload_partial/$sample_id* $output_dir/analysis/fasta/upload_complete
+        done
+
 	# merge ncbi results to final results file by sample id
     	sort $ncbi_results > tmp_nresults.txt
 	sort $final_results > tmp_fresults.txt
 	echo "sample_id,ncbi_status,ncbi_notes,gisaid_status,gisaid_notes,pango_qc,nextclade_clade,pangolin_lineage,pangolin_scorpio,aa_substitutions" > $final_results
 	join <(sort tmp_nresults.txt) <(sort tmp_fresults.txt) -t $',' >> $final_results
 	
+	#remove new lines 
+	sed -i "s/\r//" $final_results
+
 	#cleanup
 	rm tmp_*.txt
 	
 	# store ncbi output file
-	cp $ncbi_output $output_dir/logs
+	cp $ncbi_hold/complete/metadata* $output_dir/logs
+	cp $ncbi_hold/complete/*failed* $output_dir/logs
+
 fi
