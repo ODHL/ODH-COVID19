@@ -2,11 +2,12 @@
 # Set args
 #########################################################
 output_dir=$1
+pipeline_config=$2
 
 #########################################################
 # Eval, source
 #########################################################
-source ./scripts/functions.sh
+source $(dirname "$0")/functions.sh
 eval $(parse_yaml ${pipeline_config} "config_")
 
 #########################################################
