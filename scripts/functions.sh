@@ -16,3 +16,16 @@ parse_yaml() {
       }
    }'
 }
+
+message_cmd_log(){
+        msg="$1"
+        echo $msg >> $pipeline_log
+	echo $msg
+}
+
+message_stats_log(){
+	msg="$1"
+	echo "$msg" >> $stats_log
+	echo "$msg"
+
+}
