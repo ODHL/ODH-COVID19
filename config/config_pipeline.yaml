@@ -31,6 +31,7 @@ nextclade_version: "5"
 cecret_version: "2"
 
 # cmds
+cecret_cmd: "/home/jenniferh/analysis_workflow/bin/Cecret"
 basespace_cmd: "/home/jenniferh/analysis_workflow/bin/basespace"
 
 # reference files
