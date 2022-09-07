@@ -39,7 +39,6 @@ reference_genome: "MN908947.3.fasta"
 gff_file: "MN908947.3.gff"
 primer_bed: "artic_V4.1_SARS-CoV-2.primer.bed"
 amplicon_bed: "artic_V4.1_SARS-CoV-2.insert.bed"
-primer_set: "ncov_V4.1"
 
 ############# GISAID 
 percent_n_cutoff: 50
