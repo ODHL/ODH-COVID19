@@ -75,7 +75,7 @@ fi
 # To avoid issues within project naming schema remove all information after spaces
 project_name_full=$(echo $project_id | sed 's:/*$::')
 project_name=$(echo $project_id | cut -f1 -d "_" | cut -f1 -d " ")
-output_dir="../$project_name"
+output_dir="/home/jenniferh/$project_name"
 
 #set defaults for optional args
 if [ -z "$qc_flag" ]; then qc_flag="Y"; fi
@@ -177,7 +177,7 @@ elif [[ "$pipeline" == "cecret" ]]; then
     	# Run CECRET pipeline
     	#############################################################################################
    	message_cmd_log "------------------------------------------------------------------------"
-    	message_cmd_log "-- STARTING CECRET PIPELINE ---"
+    	message_cmd_log "--- STARTING CECRET PIPELINE ---"
 
 	# check initialization was completed
 	check_initialization
@@ -195,7 +195,8 @@ elif [[ "$pipeline" == "cecret" ]]; then
 		"${date_stamp}" \
 		"${pipeline_log}" \
 		"${qc_flag}" \
-		"${partial_flag}"
+		"${partial_flag}" \
+		"${testing_flag}"
 		
 	# run QC
 	bash scripts/seq_qc.sh \
@@ -384,7 +385,7 @@ elif [[ "$pipeline" == "stats" ]]; then
         val=`ls ${output_dir}/analysis/fasta/*/*.fa | wc -l`
 	message_stats_log "--Total number of samples $val"
 	
-	# number failed pipeline qC
+	# number failed pipeline QC
 	val1=`cat $final_results | grep "qc_fail" | grep -v "missing_metadata" | grep -v "gisaid_rejected" | grep -v "gisaid_fail" |  wc -l`
 	message_stats_log "----Number failed pipeline QC: $val1"
 

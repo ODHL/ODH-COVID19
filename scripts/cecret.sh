@@ -145,7 +145,7 @@ cat "$cecret_config" | grep "params.primer_bed" >> $pipeline_log
 cat "$cecret_config" | grep "params.amplicon_bed" >> $pipeline_log
 
 message_cmd_log "------------------------------------------------------------------------"
-message_cmd_log "--- STARTING CECRET PIPELINE ---"
+message_cmd_log "--- STARTING CECRET ANALYSIS ---"
 
 echo "Starting time: `date`" >> $pipeline_log
 echo "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
@@ -262,18 +262,21 @@ if [[ $flag_batch == "Y" ]]; then
 	# For testing scenarios two batches of two samples will be run
 	# Take the first four samples and remove all other batches
 	if [[ "$testing_flag" == "Y" ]]; then
-		
-		for (( batch_id=1; batch_id<=$batch_count; batch_id++ )); do
-        		batch_manifest=$log_dir/batch_0$batch_id.txt
-        
-        		if [[ "$batch_id" == 1 ]] || [[ "$batch_id" == 2 ]]; then
-            			head -2 $batch_manifest > tmp.txt
-            			mv tmp.txt $batch_manifest
-        		else
-            			rm $batch_manifest
-        		fi
-		done
-		
+		# create save dir for new batches
+		mkdir -p $log_dir/save
+		batch_manifest=$log_dir/batch_01.txt
+
+		# grab the first two samples and last two samples, save as new batches
+		head -2 $batch_manifest > $log_dir/save/batch_01.txt
+		tail -2 $batch_manifest > $log_dir/save/batch_02.txt
+
+		# remove old  manifests
+		rm $log_dir/batch_*
+
+		# replace update manifests and cleanup
+		mv $log_dir/save/* $log_dir
+		sudo rm -r $log_dir/save
+
 		# set new batch count
 		batch_count=2
 		sample_count=4
@@ -303,9 +306,8 @@ if [[ $flag_cecret == "Y" ]]; then
 		# set batch name
 		if [[ "$batch_id" -gt 9 ]]; then batch_name=$batch_id; else batch_name=0${batch_id}; fi
 		
-		#set manifest
+		#set batch manifest, dirs
 		batch_manifest=$log_dir/batch_${batch_name}.txt
-
 		fastq_batch_dir=$fastq_dir/batch_$batch_id
 		cecret_batch_dir=$cecret_dir/batch_$batch_id
 		if [[ ! -d $fastq_batch_dir ]]; then mkdir $fastq_batch_dir; fi
@@ -314,12 +316,10 @@ if [[ $flag_cecret == "Y" ]]; then
 		#read text file
 		IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest
 
-		#log
 		# print number of lines in file without file name "<"
 		n_samples=`wc -l < $batch_manifest`
 		echo "----Batch_$batch_id ($n_samples samples)"
 		echo "----Batch_$batch_id ($n_samples samples)" >> $pipeline_log
-
 
 		#run per sample, download files
 		for sample_id in ${sample_list[@]}; do
@@ -357,7 +357,7 @@ if [[ $flag_cecret == "Y" ]]; then
 	
 		# changes in software adds project name to some sample_ids. In order to ensure consistency throughout naming and for downstream
         	# uploading, project name should be removed.
-        	dir_list=($fastq_batch_dir/* $tmp_dir/unzipped/* $log_dir/batch_*)
+        	dir_list=($fastq_batch_dir/*)
         	for dir_id in ${dir_list[@]}; do
                 	for f in "$dir_id"; do
                         	# remove projectid from header
@@ -367,17 +367,6 @@ if [[ $flag_cecret == "Y" ]]; then
                         	new_id=`echo $f | awk -v p_id=-$project_name_full '{ gsub(p_id,"",$1) ; print }'`
                         	if [[ $f != $new_id ]]; then mv $f $new_id; fi
                 	done
-
-			#irregular name
-			tmp_id="OH-M2941-220613"
-			for f in "$dir_id"; do
-                                # remove projectid from header
-                                sed -i "s/-$tmp_id//g" $f
-
-                                # rename files
-                                new_id=`echo $f | awk -v p_id=-$tmp_id '{ gsub(p_id,"",$1) ; print }'`
-                                if [[ $f != $new_id ]]; then mv $f $new_id; fi
-                        done
         	done
 
 		#create proj tmp dir to enable multiple projects to be run simultaneously
@@ -446,6 +435,19 @@ if [[ $flag_reporting == "Y" ]]; then
 		echo "---Starting time: `date`" >> $pipeline_log
 		echo "---Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 
+             	# uploading, project name should be removed.
+                dir_list=($tmp_dir/unzipped/*)
+                for dir_id in ${dir_list[@]}; do
+                        for f in "$dir_id"; do
+                                # remove projectid from header
+                                sed -i "s/-$project_name_full//g" $f
+
+                                # rename files
+                                new_id=`echo $f | awk -v p_id=-$project_name_full '{ gsub(p_id,"",$1) ; print }'`
+                                if [[ $f != $new_id ]]; then mv $f $new_id; fi
+                        done
+                done
+
 		#-d -dd 1 adds dir name to sample name
 		multiqc -f -v \
 	    	-c $multiqc_config \
@@ -465,7 +467,7 @@ if [[ $flag_reporting == "Y" ]]; then
 	
 	# merge batch outputs into intermediate files
 	# join contents of nextclade and pangolin into final output table	
-	awk -F';' -vcols=seqName,clade,aaSubstitutions '(NR==1){n=split(cols,cs,",");for(c=1;c<=n;c++){for(i=1;i<=NF;i++)if($(i)==cs[c])ci[c]=i}}{for(i=1;i<=n;i++)printf "%s" FS,$(ci[i]);printf "\n"}' $merged_nextclade | sed -s "s/Consensus_//g" | sed -s "s/.consensus_threshold_0.6_quality_20//g" | sed -s "s/;/,/g" | sed "s/,$//" | grep -v "seqName" >> $final_nextclade
+	awk -F';' -vcols=seqName,clade,aaSubstitutions '(NR==1){n=split(cols,cs,",");for(c=1;c<=n;c++){for(i=1;i<=NF;i++)if($(i)==cs[c])ci[c]=i}}{for(i=1;i<=n;i++)printf "%s" FS,$(ci[i]);printf "\n"}' $merged_nextclade | sed -s "s/Consensus_//g" | sed -s "s/.consensus_threshold_0.6_quality_20//g"  | grep -v "seqName" | awk -F";" -v q="\"" '{print $1","$2","q$3q }' | grep -v "seqName" >> $final_nextclade
 
 	# from pangloin: sampleid, lineage, qc_status
 	awk -F',' -vcols=taxon,qc_status,lineage,scorpio_call,pangolin_version '(NR==1){n=split(cols,cs,",");for(c=1;c<=n;c++){for(i=1;i<=NF;i++)if($(i)==cs[c])ci[c]=i}}{for(i=1;i<=n;i++)printf "%s" FS,$(ci[i]);printf "\n"}' $merged_pangolin | sed -s "s/Consensus_//g" | sed -s "s/.consensus_threshold_0.6_quality_20//g" | sed 's/.$//' | grep -v "taxon" >> $final_pangolin	
