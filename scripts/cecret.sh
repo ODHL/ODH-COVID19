@@ -18,7 +18,7 @@ testing_flag=${10}
 flag_download="Y"
 flag_batch="Y"
 flag_cecret="Y"
-flag_cleanup="Y"
+flag_cleanup="N"
 flag_reporting="Y"
 
 ##########################################################
@@ -156,7 +156,7 @@ echo "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 if [[ $flag_download == "Y" ]]; then
 	#get project id
 	project_id=`$config_basespace_cmd list projects --filter-term="${project_name_full}" | sed -n '4 p' | awk '{split($0,a,"|"); print a[3]}' | sed 's/ //g'`
-	
+	echo $config_basespace_cmd list projects --filter-term="${project_name_full}" 
 	# if the project name does not match completely with basespace an ID number will not be found
 	# display all available ID's to re-run project	
 	if [ -z "$project_id" ] && [ "$partial_flag" != "Y" ]; then
