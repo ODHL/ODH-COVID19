@@ -73,9 +73,10 @@ fi
 # Remove trailing / to project_name if it exists
 # some projects may have additional information (IE OH-1234 SARS ONLY) in the name
 # To avoid issues within project naming schema remove all information after spaces
+# To ensure consistency in all projects, remove all information after _
 project_name_full=$(echo $project_id | sed 's:/*$::')
 project_name=$(echo $project_id | cut -f1 -d "_" | cut -f1 -d " ")
-output_dir="/home/jenniferh/$project_name"
+output_dir="/home/ubuntu/$project_name"
 
 #set defaults for optional args
 if [ -z "$qc_flag" ]; then qc_flag="Y"; fi
@@ -219,7 +220,7 @@ elif [[ "$pipeline" == "gisaid" ]]; then
         	# Eval YAML args
         	metadata_file="$log_dir/$config_metadata_file"
 
-		# determine number of samples
+       		#determine number of samples
 		fasta_number=`ls "$fasta_dir/not_uploaded"/ | wc -l`
 		
 		# run QC on fasta samples

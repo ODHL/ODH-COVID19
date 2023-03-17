@@ -157,6 +157,7 @@ if [[ $flag_download == "Y" ]]; then
 	#get project id
 	project_id=`$config_basespace_cmd list projects --filter-term="${project_name_full}" | sed -n '4 p' | awk '{split($0,a,"|"); print a[3]}' | sed 's/ //g'`
 	echo $config_basespace_cmd list projects --filter-term="${project_name_full}" 
+	
 	# if the project name does not match completely with basespace an ID number will not be found
 	# display all available ID's to re-run project	
 	if [ -z "$project_id" ] && [ "$partial_flag" != "Y" ]; then
@@ -201,8 +202,10 @@ if [[ $flag_batch == "Y" ]]; then
 	# If a partial run is being performed, a batch file is required as user input
 	echo "--Creating batch files"
 	if [[ "$partial_flag" == "N" ]]; then
+		ls $tmp_dir
 		#create sample_id file - grab all files in dir, split by _, exclude noro- file names
-		ls $tmp_dir | cut -f1 -d "_" | grep "202[0-9]." | grep -v "noro.*" > $sample_id_file
+		ls $tmp_dir | grep "ds"| cut -f1 -d "_" | grep -v "noro.*" > $sample_id_file
+		#ls $tmp_dir | cut -f1 -d "_" | grep "202[0-9]." | grep -v "noro.*" > $sample_id_file
 
     		#read in text file with all project id's
     		IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file
@@ -373,8 +376,10 @@ if [[ $flag_cecret == "Y" ]]; then
 		if [[ ! -d $project_id ]]; then mkdir $project_id; fi
 		cd $project_id
 		
-		cecret_cmd_line=".././bin/nextflow run $cecret_cmd --reads $fastq_batch_dir --reads_type paired -c $cecret_config --outdir $cecret_batch_dir"
+		cecret_cmd_line="$HOME/nextflow run $cecret_cmd --reads $fastq_batch_dir --reads_type paired -c $cecret_config --outdir $cecret_batch_dir"
+		echo $cecret_cmd_line
 		$cecret_cmd_line
+		
 
 		# log
     		echo "-------Ending time: `date`" >> $pipeline_log
@@ -460,7 +465,7 @@ if [[ $flag_reporting == "Y" ]]; then
 		rm -r $qcreport_dir
 
 		#create fragment plot
-		python scripts/fragment_plots.py $merged_fragment $fragement_plot
+		python333 scripts/fragment_plots.py $merged_fragment $fragement_plot
 	else
 		rm -r $qc_dir
 	fi 

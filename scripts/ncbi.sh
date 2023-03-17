@@ -174,8 +174,8 @@ if [[ "$pipeline_download" == "Y" ]]; then
 	# download fastq files for samples uploaded to gisaid	
 	for f in `ls -1 "$fasta_partial"`; do
 		download_name=`echo $f | cut -f1 -d"."`
-		$basespace_command download biosample -n ${download_name}-OH-M2941-220613 -o $ncbi_hold
-		#$basespace_command download biosample -n ${download_name}-${project_id} -o $ncbi_hold
+		#$basespace_command download biosample -n ${download_name}-OH-M2941-220613 -o $ncbi_hold
+		$basespace_command download biosample -n ${download_name}-${project_id} -o $ncbi_hold
 	        #$basespace_command download biosample -n ${download_name} -o $ncbi_hold
 	done
 

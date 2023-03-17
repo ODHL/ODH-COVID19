@@ -16,7 +16,8 @@ batch_limit: "55"
 # 22 for 4.1.2-pdata-1.13
 # 23 for 4.1.3-pdata-1.15.1
 # 24 for 4.1.3-pdata-1.16
-pangolin_version: "24"
+# 25 for 4.1.3-pdata-1.17
+pangolin_version: "25"
 
 # nextclade version
 # to check versions available to go: https://hub.docker.com/r/nextstrain/nextclade/tags
@@ -27,7 +28,8 @@ pangolin_version: "24"
 # 5 for nextstrain/nextclade:2.4.0
 # 6 for nextstrain/nextclade:2.7.0
 # 7 for nextstrain/nextclade:2.8.0
-nextclade_version: "7"
+# 8 for nextstrain/nextclade:2.9.1
+nextclade_version: "8"
 
 # staphb version
 # 1 for 3.10
@@ -35,11 +37,12 @@ nextclade_version: "7"
 cecret_version: "2"
 
 # cmds
-cecret_cmd: "/home/jenniferh/analysis_workflow/bin/Cecret"
-basespace_cmd: "/home/jenniferh/analysis_workflow/bin/basespace"
+cecret_cmd: "/home/ubuntu/analysis_workflow/bin/Cecret"
+basespace_cmd: "/home/ubuntu/analysis_workflow/bin/basespace"
+gisaid_cmd: ""
 
 # reference files
-reference_dir: "/home/jenniferh/analysis_workflow/refs"
+reference_dir: "/home/ubuntu/analysis_workflow/refs"
 reference_genome: "MN908947.3.fasta"
 gff_file: "MN908947.3.gff"
 primer_bed: "artic_V4.1_SARS-CoV-2.primer.bed"
@@ -48,7 +51,7 @@ amplicon_bed: "artic_V4.1_SARS-CoV-2.insert.bed"
 ############# GISAID 
 percent_n_cutoff: 50
 metadata_file: "merged_complete.csv"
-gisaid_auth: "/home/jenniferh/analysis_workflow/bin/gisaid/authtokens/sevillas2/gisaid.authtoken"
+gisaid_auth: "/home/ubuntu/analysis_workflow/bin/gisaid/authtokens/gisaid.authtoken"
 
 submitter: "sevillas2"
 type: "betacoronavirus"
@@ -59,7 +62,7 @@ patient_status: "unknown"
 sequencing_technology: "Illumina Miseq"
 submitting_lab: "Ohio Department of Health Laboratory"
 address_submitting: "8995 East Main Street, Reynoldsburg, Ohio 43068"
-authors: "Samantha Sevilla, Jennifer Holmes, Eric Brandt, Keoni Omura, Glen McGillivary, Caitlin McDonnell, Jade Mowery, Stephanie Mccracken, Tyler Payne, Kirtana Ramadugu, Erica Leasure, Brent Lee, Kelsey Florek, Heather Blankenship, Allison Black, Quanta Brown, Tammy Bannerman"
+authors: "Samantha Sevilla, Eric Brandt, Keoni Omura, Glen McGillivary, Caitlin McDonnell, Jade Mowery, Stephanie Mccracken, Tyler Payne, Erica Leasure, Brent Lee, Quanta Brown, Tammy Bannerman"
 
 ############# NCBI (attributes)
 bioproject_accession: "PRJNA701669"

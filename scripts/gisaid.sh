@@ -24,6 +24,7 @@ fasta_notuploaded=$output_dir/analysis/fasta/not_uploaded
 fasta_uploaded=$output_dir/analysis/fasta/upload_partial
 fasta_failed=$output_dir/analysis/fasta/upload_failed
 log_dir=$output_dir/logs
+pipeline_log=$log_dir/pipeline_log.txt
 
 # set files
 gisaid_log="$log_dir/gisaid_log_${project_id}_${date_stamp}.txt"
@@ -60,7 +61,8 @@ fi
 # Code
 #########################################################
 if [[ "$pipeline_prep" == "Y" ]]; then
-        echo "----PREPARING FILES"
+        echo "Ending time: `date`" >> $pipeline_log
+	echo "----PREPARING FILES"
 	# create files
         if [[ -f $batched_meta ]]; then rm $batched_meta; fi
         if [[ -f $gisaid_results ]]; then rm $gisaid_results; fi
@@ -199,7 +201,7 @@ if [[ "$pipeline_upload" == "Y" ]]; then
 	# if this is a re-run, save previous log file
 	if [[ -f "${gisaid_log}" ]]; then mv ${gisaid_log} ${gisaid_log}_v1; fi
 	
-	cli2 upload --metadata $batched_meta --fasta $batched_fasta --token $gisaid_auth --log $gisaid_log --failed $gisaid_failed --frameshift catch_novel
+	cli3 upload --metadata $batched_meta --fasta $batched_fasta --token $gisaid_auth --log $gisaid_log --failed $gisaid_failed --frameshift catch_novel
 fi
 
 if [[ "$pipeline_qc" == "Y" ]]; then
@@ -255,6 +257,11 @@ if [[ "$pipeline_qc" == "Y" ]]; then
 	join <(sort tmp_gresults.txt) <(sort tmp_fresults.txt) -t $',' >> $final_results
 	rm tmp_fresults.txt tmp_gresults.txt
 
+	# ensure fastas dont have multiple .fa's 
+	for f in $project_dir/analysis/fastas/*/*; do
+		new_name`echo $f | awk -F"[.]fa" '{ print $1".fa" }'`
+		mv $f $new_name
+	done
 fi
 
 if [[ "$pipeline_rejected" == "Y" ]]; then
