@@ -37,12 +37,12 @@ nextclade_version: "8"
 cecret_version: "2"
 
 # cmds
-cecret_cmd: "/home/ubuntu/analysis_workflow/bin/Cecret"
-basespace_cmd: "/home/ubuntu/analysis_workflow/bin/basespace"
+cecret_cmd: "/home/ubuntu/SARS_CoV_2_Workflow/bin/Cecret"
+basespace_cmd: "/home/ubuntu/SARS_CoV_2_Workflow/bin/basespace"
 gisaid_cmd: ""
 
 # reference files
-reference_dir: "/home/ubuntu/analysis_workflow/refs"
+reference_dir: "/home/ubuntu/SARS_CoV_2_Workflow/refs"
 reference_genome: "MN908947.3.fasta"
 gff_file: "MN908947.3.gff"
 primer_bed: "artic_V4.1_SARS-CoV-2.primer.bed"
@@ -51,7 +51,7 @@ amplicon_bed: "artic_V4.1_SARS-CoV-2.insert.bed"
 ############# GISAID 
 percent_n_cutoff: 50
 metadata_file: "merged_complete.csv"
-gisaid_auth: "/home/ubuntu/analysis_workflow/bin/gisaid/authtokens/gisaid.authtoken"
+gisaid_auth: "/home/ubuntu/SARS_CoV_2_Workflow/bin/gisaid/authtokens/gisaid.authtoken"
 
 submitter: "sevillas2"
 type: "betacoronavirus"
