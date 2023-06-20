@@ -21,16 +21,12 @@ helpFunction()
 {
    echo ""
    echo "Usage: $1 -m [REQUIRED]pipeline mode options"
-   echo -e "\t-m options: init, run, gisaid, ncbi, stat, update"
+   echo -e "\t-m options: init, cecret, gisaid, ncbi, stat, update"
    echo "Usage: $2 -n [REQUIRED] project_id"
    echo -e "\t-n project id"
-   echo "Usage: $3 -q [OPTIONAL] qc_flag"
-   echo -e "\t-q Y,N option to run QC analysis (default Y)"
-   echo "Usage: $4 -t [OPTIONAL] testing_flag"
-   echo -e "\t-t Y,N option to run test settings (default N)"   
-   echo "Usage: $5 -p [OPTIONAL] partial_run"
-   echo -e "\t-p Y,N option to run partial run settings (default N)"
-   echo "Usage: $6 -r [OPTIONAL] reject_flag"
+   echo "Usage: $3 -t [OPTIONAL] testing_flag"
+   echo -e "\t-t Y,N option to run test settings (default N,U,G)"   
+   echo "Usage: $4 -r [OPTIONAL] reject_flag"
    echo -e "\t-r Y,N option to run GISAID rejected sample processing (default N)"
    exit 1 # Exit script after printing help
 }
@@ -48,14 +44,12 @@ source $(dirname "$0")/scripts/functions.sh
 #############################################################################################
 # helper function
 #############################################################################################
-while getopts "m:n:q:t:p:r:" opt
+while getopts "m:n:t:r:" opt
 do
    case "$opt" in
         m ) pipeline="$OPTARG" ;;
         n ) project_id="$OPTARG" ;;
-        q ) qc_flag="$OPTARG" ;;
         t ) testing_flag="$OPTARG" ;;
-        p ) partial_flag="$OPTARG" ;;
        	r ) reject_flag="$OPTARG" ;;
 	? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
    esac
@@ -76,10 +70,9 @@ fi
 # To ensure consistency in all projects, remove all information after _
 project_name_full=$(echo $project_id | sed 's:/*$::')
 project_name=$(echo $project_id | cut -f1 -d "_" | cut -f1 -d " ")
-output_dir="/home/ubuntu/$project_name"
+output_dir="/home/ubuntu/output/$project_name"
 
 #set defaults for optional args
-if [ -z "$qc_flag" ]; then qc_flag="Y"; fi
 if [ -z "$testing_flag" ]; then testing_flag="N"; fi
 if [ -z "$partial_flag" ]; then partial_flag="N"; fi
 if [ -z "$reject_flag" ]; then reject_flag="N"; fi
@@ -195,8 +188,6 @@ elif [[ "$pipeline" == "cecret" ]]; then
 		"${multiqc_config}" \
 		"${date_stamp}" \
 		"${pipeline_log}" \
-		"${qc_flag}" \
-		"${partial_flag}" \
 		"${testing_flag}"
 		
 	# run QC
@@ -217,10 +208,10 @@ elif [[ "$pipeline" == "gisaid" ]]; then
 		message_cmd_log "------------------------------------------------------------------------"
 		message_cmd_log "--- STARTING GISAID PIPELINE ---"
 
-        	# Eval YAML args
-        	metadata_file="$log_dir/$config_metadata_file"
+        # Eval YAML args
+    	metadata_file="$log_dir/$config_metadata_file"
 
-       		#determine number of samples
+   		#determine number of samples
 		fasta_number=`ls "$fasta_dir/not_uploaded"/ | wc -l`
 		
 		# run QC on fasta samples
@@ -228,10 +219,10 @@ elif [[ "$pipeline" == "gisaid" ]]; then
 			echo "----Processing $fasta_number samples"
 	        
 			# check metadata file exists
-        		if [[ ! -f $metadata_file ]]; then
-                		echo "----Missing metadata file $metadata_file. File must be located in $log_dir. Review config_pipeline to update file name."
-                		exit
-        		fi
+        	if [[ ! -f $metadata_file ]]; then
+        		echo "----Missing metadata file $metadata_file. File must be located in $log_dir. Review config_pipeline to update file name."
+            	exit
+        	fi
 		else
 			echo "----Missing fasta files"
 			exit
@@ -241,14 +232,14 @@ elif [[ "$pipeline" == "gisaid" ]]; then
 		echo "--uploading samples" >> $pipeline_log
         	
 		# run gisaid script
-        	bash scripts/gisaid.sh "${output_dir}" "${project_id}" "${pipeline_config}" "${final_results}" "${reject_flag}" 2>> "$pipeline_log"
+        bash scripts/gisaid.sh "${output_dir}" "${project_id}" "${pipeline_config}" "${final_results}" "${reject_flag}" 2>> "$pipeline_log"
         
-	        # run stats
-	        bash run_analysis_pipeline.sh -m stats -n $project_id
+	    # run stats
+        bash run_analysis_pipeline.sh -m stats -n $project_id
 	else
 		# determine number of samples
 		sample_number=`cat reject_search.csv | wc -l`
-                echo "--Processing rejected $sample_number samples"
+        echo "--Processing rejected $sample_number samples"
 	
 		# find the samples that were rejected	
 		if [[ -f reject_find.csv ]]; then rm reject_find.csv; fi
@@ -304,14 +295,14 @@ elif [[ "$pipeline" == "gisaid" ]]; then
 	message_cmd_log "------------------------------------------------------------------------"
 elif [[ "$pipeline" == "ncbi" ]]; then
 	
-        ##########################################################
-        # Eval, source
-        #########################################################
+    ##########################################################
+    # Eval, source
+    #########################################################
 	eval $(parse_yaml ${pipeline_config} "config_")
 
 	#############################################################################################
-        # Run NCBI UPLOAD
-        #############################################################################################
+    # Run NCBI UPLOAD
+    #############################################################################################
 	message_cmd_log "------------------------------------------------------------------------"
 	message_cmd_log "--- STARTING NCBI PIPELINE ---"
 
@@ -320,10 +311,10 @@ elif [[ "$pipeline" == "ncbi" ]]; then
 	ncbi_mput=$log_dir/${project_id}_${date_stamp}_mput.txt
 	gisaid_results=$analysis_dir/intermed/gisaid_results.csv
 
-        # Eval YAML args
+    # Eval YAML args
 	metadata_file="$log_dir/$config_metadata_file"
 
-        # run inital upload or merge results
+    # run inital upload or merge results
 	if [[ $reject_flag == "N" ]]; then	
 		# determine number of samples
 		fasta_number=`ls "$fasta_dir/upload_partial"/ | wc -l`
@@ -348,7 +339,7 @@ elif [[ "$pipeline" == "ncbi" ]]; then
 			
 			# rename the file
 			new_name=`echo $f | sed "s/-processed-ok//g"`
-    			mv $f $new_name
+    		mv $f $new_name
 		done
 
 		cat $header > $ncbi_hold/complete/$final
@@ -364,7 +355,7 @@ elif [[ "$pipeline" == "ncbi" ]]; then
 			bash scripts/ncbi.sh "${output_dir}" "${project_id}" "${pipeline_config}" "${gisaid_results}" "${reject_flag}" "${final_results}"
 		
 			# run stats
-                	bash run_analysis_pipeline.sh -m stats -n $project_id
+            bash run_analysis_pipeline.sh -m stats -n $project_id
 		else
 			echo "MISSING metadata output file"
 		fi
@@ -383,7 +374,7 @@ elif [[ "$pipeline" == "stats" ]]; then
 	message_stats_log "*** RUNNING PIPELINE STATS ***"
 	
 	# total number
-        val=`ls ${output_dir}/analysis/fasta/*/*.fa | wc -l`
+    val=`ls ${output_dir}/analysis/fasta/*/*.fa | wc -l`
 	message_stats_log "--Total number of samples $val"
 	
 	# number failed pipeline QC
@@ -391,15 +382,15 @@ elif [[ "$pipeline" == "stats" ]]; then
 	message_stats_log "----Number failed pipeline QC: $val1"
 
 	# number of samples with missing metadata
-        val2=`cat $final_results | grep "missing" | wc -l`
-        message_stats_log "----Number missing metadata: $val2"
-        if [[ $val2 -gt 0 ]]; then
-               cat $intermed_dir/gisaid_results.csv | grep "missing" > $log_dir/missing_metadata.csv
-               sed -i "s/gisaid_fail/$project_id/g" $log_dir/missing_metadata.csv
-        fi
+    val2=`cat $final_results | grep "missing" | wc -l`
+    message_stats_log "----Number missing metadata: $val2"
+    if [[ $val2 -gt 0 ]]; then
+        cat $intermed_dir/gisaid_results.csv | grep "missing" > $log_dir/missing_metadata.csv
+       sed -i "s/gisaid_fail/$project_id/g" $log_dir/missing_metadata.csv
+    fi
 	
 	val=$((val-val1-val2))
-        message_stats_log "----Number pased pipeline QC: $val"
+    message_stats_log "----Number pased pipeline QC: $val"
 
 	################# GISAID
 	message_stats_log "-- GISAID STATS"
@@ -408,18 +399,18 @@ elif [[ "$pipeline" == "stats" ]]; then
 	message_stats_log "---- Number GISAID uploaded successfully: $val"
 
 	# number failed upload
-        val=`cat $final_results | grep -e "gisaid_fail" -e "gisaid_rejected" | wc -l`
+    val=`cat $final_results | grep -e "gisaid_fail" -e "gisaid_rejected" | wc -l`
 	message_stats_log "---- Number GISAID uploaded and rejected: $val"
 	
 	################## NCBI
 	message_stats_log "-- NCBI Results"
-        # number passed upload
-        val=`cat $final_results | grep "ncbi_pass" | wc -l`
-        message_stats_log "---- Number NCBI uploaded: $val"
+    # number passed upload
+    val=`cat $final_results | grep "ncbi_pass" | wc -l`
+    message_stats_log "---- Number NCBI uploaded: $val"
 
-        # number passed upload
-        val=`cat $final_results | grep "ncbi_duplicated" | wc -l`
-        message_stats_log "---- Number NCBI duplicated: $val"
+    # number passed upload
+    val=`cat $final_results | grep "ncbi_duplicated" | wc -l`
+    message_stats_log "---- Number NCBI duplicated: $val"
 
 	message_stats_log "*** COMPLETE PIPELINE ***"
 elif [[ "$pipeline" == "cleanup" ]]; then

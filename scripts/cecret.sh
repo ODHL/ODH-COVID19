@@ -8,13 +8,15 @@ cecret_config=$4
 multiqc_config=$5
 date_stamp=$6
 pipeline_log=$7
-qc_flag=$8
-partial_flag=$9
-testing_flag=${10}
+flag_testing=${8}
 
 #########################################################
 # Pipeline controls
 ########################################################
+# three options for testing 
+## N = run full run
+## T = run 2 batches, 4 samples
+## U = run user generated manifest
 flag_download="Y"
 flag_batch="Y"
 flag_cecret="Y"
@@ -34,6 +36,8 @@ final_results=$analysis_dir/final_results_$date_stamp.csv
 pangolin_id=$config_pangolin_version
 nextclade_id=$config_nextclade_version
 cecret_id=$config_cecret_version
+primer_id=$config_primer_version
+insert_id=$config_insert_version
 
 # set dir
 log_dir=$output_dir/logs
@@ -71,6 +75,8 @@ final_results=$analysis_dir/final_results_$date_stamp.csv
 pangolin_version=`cat config/software_versions.txt | awk '$1 ~ /pangolin/' | awk -v pid="$pangolin_id" '$2 ~ pid' | awk '{ print $3 }'`
 nextclade_version=`cat config/software_versions.txt | awk '$1 ~ /nextclade/' | awk -v pid="$nextclade_id" '$2 ~ pid' | awk '{ print $3 }'`
 cecret_version=`cat config/software_versions.txt | awk '$1 ~ /cecret/' | awk -v pid="$cecret_id" '$2 ~ pid' | awk '{ print $3 }'`
+primer_version=`cat config/software_versions.txt | awk '$1 ~ /primer/' | awk -v pid="$primer_id" '$2 ~ pid' | awk '{ print $3 }'`
+insert_version=`cat config/software_versions.txt | awk '$1 ~ /insert/' | awk -v pid="$insert_id" '$2 ~ pid' | awk '{ print $3 }'`
 if [[ "$pangolin_version" == "" ]] | [[ "$nextclade_version" == "" ]]; then
     echo "Choose the correct version of PANGOLIN/NEXTCLADE in /project/logs/config_pipeline.yaml"
     echo "PANGOLIN: $pangolin_version"
@@ -80,7 +86,7 @@ fi
 
 # set cmd
 cecret_cmd=$config_cecret_cmd
-
+fragment_plots_script=$config_frag_plot_script
 #############################################################################################
 # CECRET UPDATES
 #############################################################################################
@@ -94,17 +100,6 @@ old_cmd="nextclade:latest'"
 new_cmd="nextclade:$nextclade_version'"
 sed -i "s/$old_cmd/$new_cmd/" $cecret_config
 
-## update config if QC is not needed
-if [[ "$qc_flag" == "N" ]]; then
-	old_cmd="params.samtools_stats = true"
-	new_cmd="params.samtools_stats = false"
-	sed -i "s/$old_cmd/$new_cmd/" $cecret_config
-
-	old_cmd="params.fastqc = true"
-	new_cmd="params.fastqc = false"
-    sed -i "s/$old_cmd/$new_cmd/" $cecret_config
-fi
-
 ## check reference files exist in reference dir, update reference files
 # for each reference file find matching output in config_pipeline
 # remove refence file name and leave reference value
@@ -112,7 +107,7 @@ fi
 # check file existence
 # escape / with \/ for sed replacement
 # replace the cecret config file with the reference selected
-reference_list=("reference_genome" "gff_file" "primer_bed" "amplicon_bed")
+reference_list=("reference_genome" "gff_file")
 for ref_file in ${reference_list[@]}; do
     ref_line=$(cat "${pipeline_config}" | grep $ref_file)
     ref_path=`echo $config_reference_dir/${ref_line/"$ref_file": /} | tr -d '"'`
@@ -127,6 +122,20 @@ for ref_file in ${reference_list[@]}; do
     fi
 done
 
+ref_file="primer_bed"
+ref_path=`echo $config_reference_dir/${primer_version/"$ref_file": /} | tr -d '"'`
+old_cmd="params.$ref_file = \"TBD\""
+new_cmd="params.$ref_file = \"$ref_path\""
+new_cmd=$(echo $new_cmd | sed 's/\//\\\//g')
+sed -i "s/$old_cmd/$new_cmd/" $cecret_config
+
+ref_file="amplicon_bed"
+ref_path=`echo $config_reference_dir/${insert_version/"$ref_file": /} | tr -d '"'`
+old_cmd="params.$ref_file = \"TBD\""
+new_cmd="params.$ref_file = \"$ref_path\""
+new_cmd=$(echo $new_cmd | sed 's/\//\\\//g')
+sed -i "s/$old_cmd/$new_cmd/" $cecret_config
+
 #############################################################################################
 # LOG INFO TO CONFIG
 #############################################################################################
@@ -138,6 +147,8 @@ message_cmd_log "Analysis date: `date`"
 message_cmd_log "Pangolin version: $pangolin_version"
 message_cmd_log "Nexclade version: $nextclade_version"
 message_cmd_log "Cecret version: $cecret_version"
+message_cmd_log "Amplicon version: $primer_version"
+message_cmd_log "Insert version: $insert_version"
 
 cat "$cecret_config" | grep "params.reference_genome" >> $pipeline_log
 cat "$cecret_config" | grep "params.gff_file" >> $pipeline_log
@@ -154,41 +165,34 @@ echo "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 # Project Downloads
 #############################################################################################	
 if [[ $flag_download == "Y" ]]; then
+	echo "--Downloading sample data"
+
 	#get project id
 	project_id=`$config_basespace_cmd list projects --filter-term="${project_name_full}" | sed -n '4 p' | awk '{split($0,a,"|"); print a[3]}' | sed 's/ //g'`
-	echo $config_basespace_cmd list projects --filter-term="${project_name_full}" 
 	
 	# if the project name does not match completely with basespace an ID number will not be found
 	# display all available ID's to re-run project	
-	if [ -z "$project_id" ] && [ "$partial_flag" != "Y" ]; then
+	if [ -z "$project_id" ]; then
 		echo "The project id was not found from $project_name_full. Review available project names below and try again"
 		exit
 	fi
 
-	# if a QC report is to be created (qc_flag=Y) then download the necessary project analysis files
-	# if it is not needed, and a full run is being completed
-	# then download smaller json files to determine all sample ids in project
-	if [[ "$qc_flag" == "Y" ]]; then
-		message_cmd_log "--Downloading analysis files (this may take a few minutes to begin)"
-		echo "---Starting time: `date`" >> $pipeline_log
+	# output start message
+	message_cmd_log "--Downloading analysis files (this may take a few minutes to begin)"
+	echo "---Starting time: `date`" >> $pipeline_log
 	
-		$config_basespace_cmd download project --quiet -i $project_id -o "$tmp_dir" --extension=zip
-	
-		echo "---Ending time: `date`" >> $pipeline_log
-		echo "---Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
-	elif [[ "$partial_flag" == "N" ]]; then
-		message_cmd_log "--Downloading sample list (this may take a few minutes to begin)"
-		echo "---Starting time: `date`" >> $pipeline_log
-	
-		$config_basespace_cmd download project --quiet -i $project_id -o "$tmp_dir" --extension=json
-    
-		echo "---Ending time: `date`" >> $pipeline_log
-		echo "---Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
-	fi
+	# run basespace download command
+	$config_basespace_cmd download project --quiet -i $project_id -o "$tmp_dir" --extension=zip
+	echo $config_basespace_cmd list projects --filter-term="${project_name_full}" 
 
+	# output end message
+	echo "---Ending time: `date`" >> $pipeline_log
+	echo "---Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
+	
 	# remove scrubbed files, as they are zipped FASTQS and will be downloaded in batches later
-	rm -r $tmp_dir/Scrubbed*	
+	rm -rf $tmp_dir/Scrubbed*	
 fi
+
 #############################################################################################
 # Batching
 #############################################################################################
@@ -201,49 +205,54 @@ if [[ $flag_batch == "Y" ]]; then
 	# Batch count depends on user input from pipeline_config.yaml
 	# If a partial run is being performed, a batch file is required as user input
 	echo "--Creating batch files"
-	if [[ "$partial_flag" == "N" ]]; then
-		ls $tmp_dir
-		#create sample_id file - grab all files in dir, split by _, exclude noro- file names
-		ls $tmp_dir | grep "ds"| cut -f1 -d "_" | grep -v "noro.*" > $sample_id_file
-		#ls $tmp_dir | cut -f1 -d "_" | grep "202[0-9]." | grep -v "noro.*" > $sample_id_file
+	if [[ "$flag_testing" != "U" ]]; then
+		echo "----without user input"
 
-    		#read in text file with all project id's
-    		IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file
+		# create sample_id file - grab all files in dir, split by _, exclude noro- file names
+		## pulls name after _
+		# ls $tmp_dir | grep "ds"| cut -f2 -d "_" | grep -v "noro.*" > $sample_id_file
+		## pulls name before _
+		ls $tmp_dir | grep "ds"| cut -f1 -d "_" | grep -v "noro.*" > $sample_id_file
+
+    	#read in text file with all project id's
+    	IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file
 	
 		for sample_id in ${sample_list[@]}; do
         
 			#if the sample count is 1 then create new batch
-	        	if [[ "$sample_count" -eq 1 ]]; then
-        	    		batch_count=$((batch_count+1))
+	        if [[ "$sample_count" -eq 1 ]]; then
+        		batch_count=$((batch_count+1))
 	
-        	    		#remove previous versions of batch log
-            			if [[ "$batch_count" -gt 9 ]]; then batch_name=$batch_count; else batch_name=0${batch_count}; fi
+        	    #remove previous versions of batch log
+        		if [[ "$batch_count" -gt 9 ]]; then batch_name=$batch_count; else batch_name=0${batch_count}; fi
 			
 				#remove previous versions of batch log
 				batch_manifest=$log_dir/batch_${batch_name}.txt
-            			if [[ -f $batch_manifest ]]; then rm $batch_manifest; fi
+            	if [[ -f $batch_manifest ]]; then rm $batch_manifest; fi
         
-            			#create batch manifest
-	            		touch $log_dir/batch_${batch_name}.txt
-        		fi
+        		#create batch manifest
+        		touch $log_dir/batch_${batch_name}.txt
+        	fi
             	
-	        	#set batch manifest
-        		batch_manifest=$log_dir/batch_${batch_name}.txt
+	        #set batch manifest
+        	batch_manifest=$log_dir/batch_${batch_name}.txt
                 
-        		#echo sample id to the batch
- 		       	echo ${sample_id} >> $batch_manifest
+    		#echo sample id to the batch
+	       	echo ${sample_id} >> $batch_manifest
                 
-        		#increase sample counter
-        		((sample_count+=1))
+        	#increase sample counter
+        	((sample_count+=1))
             
-	        	#reset counter when equal to batch_limit
-        		if [[ "$sample_count" -gt "$config_batch_limit" ]]; then sample_count=1; fi
+	    	#reset counter when equal to batch_limit
+    		if [[ "$sample_count" -gt "$config_batch_limit" ]]; then sample_count=1; fi
 		done
 	
 		#gather final count
 		sample_count=${#sample_list[@]}
-    		batch_min=1
-	else
+    	batch_min=1
+	elif [[ "$flag_testing" == "U" ]]; then
+		echo "----with user input"
+
 		# Partial runs allow the user to submit pre-defined batch files with samples
 		# Determine how many batch files are to be used and total number of samples within files
 		batch_min=`ls $log_dir/batch* | cut -f2 -d"_" | cut -f1 -d "." | sort | head -n1`
@@ -257,14 +266,14 @@ if [[ $flag_batch == "Y" ]]; then
 		done
 
 		if [[ "$sample_count" -eq 0 ]]; then
-        		echo "At least one batch file is required for partial runs. Please create $log_dir/batch_01.txt"
-        		exit
+        	echo "At least one batch file is required for partial runs. Please create $log_dir/batch_01.txt"
+        	exit
 		fi
-	fi
-	
-	# For testing scenarios two batches of two samples will be run
-	# Take the first four samples and remove all other batches
-	if [[ "$testing_flag" == "Y" ]]; then
+	fi 
+
+	if [[ "$flag_testing" == "T" ]]; then
+		echo "----creating testing batch file"
+
 		# create save dir for new batches
 		mkdir -p $log_dir/save
 		batch_manifest=$log_dir/batch_01.txt
@@ -296,12 +305,17 @@ if [[ $flag_batch == "Y" ]]; then
 	touch $merged_summary
 	touch $merged_fragment
 fi
+
 #############################################################################################
 # Analysis
 #############################################################################################
 if [[ $flag_cecret == "Y" ]]; then
 	#log
 	message_cmd_log "--Processing batches:"
+
+	# determine number of batches
+	batch_count=`ls $log_dir/batch* | wc -l`
+	batch_min=1
 
 	#for each batch
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
@@ -328,61 +342,57 @@ if [[ $flag_cecret == "Y" ]]; then
 		for sample_id in ${sample_list[@]}; do
 			$config_basespace_cmd download biosample --quiet -n "${sample_id}" -o $fastq_dir
 
-	    		# move files to batch fasta dir
-        		#rm -r $fastq_dir/*L001*
-        		mv $fastq_dir/*${sample_id}*/*fastq.gz $fastq_batch_dir
+	    	# move files to batch fasta dir
+        	#rm -r $fastq_dir/*L001*
+    		mv $fastq_dir/*${sample_id}*/*fastq.gz $fastq_batch_dir
     
-        		# If generating a QC report, BASESPACE files need to be unzipped
-        		# and selected files moved for downstream analysis
-        		if [[ "$qc_flag" == "Y" ]]; then
-
-            			#make sample tmp_dir: tmp_dir/sample_id
-        	    		if [[ ! -d "$tmp_dir/${sample_id}" ]]; then mkdir $tmp_dir/${sample_id}; fi
+    		# If generating a QC report, BASESPACE files need to be unzipped
+        	# and selected files moved for downstream analysis
+        	# make sample tmp_dir: tmp_dir/sample_id
+    		if [[ ! -d "$tmp_dir/${sample_id}" ]]; then mkdir $tmp_dir/${sample_id}; fi
 			
-				#unzip analysis file downloaded from DRAGEN to sample tmp dir - used in QC
-				unzip -o -q $tmp_dir/${sample_id}_[0-9]*/*_all_output_files.zip -d $tmp_dir/${sample_id}
+			#unzip analysis file downloaded from DRAGEN to sample tmp dir - used in QC
+			unzip -o -q $tmp_dir/${sample_id}_[0-9]*/*_all_output_files.zip -d $tmp_dir/${sample_id}
 
-		            	#move needed files to general tmp dir
-				mv $tmp_dir/${sample_id}/ma/* $tmp_dir/unzipped
+	    	#move needed files to general tmp dir
+			mv $tmp_dir/${sample_id}/ma/* $tmp_dir/unzipped
     	
-	        	    	#remove sample tmp dir, downloaded proj dir
-        	    		rm -r --force $tmp_dir/${sample_id}
-        		fi
-
-        		# remove downloaded tmp dir
-	        	rm -r --force $tmp_dir/${sample_id}_[0-9]*/
+            #remove sample tmp dir, downloaded proj dir
+        	rm -r --force $tmp_dir/${sample_id}
+    
+    		# remove downloaded tmp dir
+	        rm -r --force $tmp_dir/${sample_id}_[0-9]*/
 		done
 
 		#log
 		message_cmd_log "------CECRET"
 		echo "-------Starting time: `date`" >> $pipeline_log
-    		echo "-------Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
+    	echo "-------Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 	
 		# changes in software adds project name to some sample_ids. In order to ensure consistency throughout naming and for downstream
-        	# uploading, project name should be removed.
-        	dir_list=($fastq_batch_dir/*)
-        	for dir_id in ${dir_list[@]}; do
-                	for f in "$dir_id"; do
-                        	# remove projectid from header
-                        	sed -i "s/-$project_name_full//g" $f
+        # uploading, project name should be removed.
+    	dir_list=($fastq_batch_dir/*)
+    	for dir_id in ${dir_list[@]}; do
+            for f in "$dir_id"; do
+                # remove projectid from header
+            	sed -i "s/-$project_name_full//g" $f
 
-                        	# rename files
-                        	new_id=`echo $f | awk -v p_id=-$project_name_full '{ gsub(p_id,"",$1) ; print }'`
-                        	if [[ $f != $new_id ]]; then mv $f $new_id; fi
-                	done
+                # rename files
+            	new_id=`echo $f | awk -v p_id=-$project_name_full '{ gsub(p_id,"",$1) ; print }'`
+                if [[ $f != $new_id ]]; then mv $f $new_id; fi
         	done
+    	done
 
 		#create proj tmp dir to enable multiple projects to be run simultaneously
 		if [[ ! -d $project_id ]]; then mkdir $project_id; fi
 		cd $project_id
 		
-		cecret_cmd_line="$HOME/nextflow run $cecret_cmd --reads $fastq_batch_dir --reads_type paired -c $cecret_config --outdir $cecret_batch_dir"
+		cecret_cmd_line="$cecret_cmd --reads $fastq_batch_dir --reads_type paired -c $cecret_config --outdir $cecret_batch_dir"
 		echo $cecret_cmd_line
 		$cecret_cmd_line
-		
 
 		# log
-    		echo "-------Ending time: `date`" >> $pipeline_log
+    	echo "-------Ending time: `date`" >> $pipeline_log
 		echo "-------Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 
 		#############################################################################################
@@ -404,17 +414,15 @@ if [[ $flag_cecret == "Y" ]]; then
 		cat $cecret_batch_dir/combined_summary.csv >> $merged_summary
 
 		# If QC report is being created, generate stats on fragment length
-    		if [[ "$qc_flag" == "Y" ]]; then
-        		for f in $cecret_batch_dir/samtools_stats/*.stats.txt; do
-            			frag_length=`cat $f | grep "average length" | awk '{print $4}'`
-    	        		file_name=`echo $f | rev | cut -f1 -d "/" | rev`
-        	    		file_name=${file_name%.stats*}
-	            		echo -e "${file_name}\t${frag_length}\t${batch_id}" >> $merged_fragment
-        		done
-		fi
+        for f in $cecret_batch_dir/samtools_stats/*.stats.txt; do
+    		frag_length=`cat $f | grep "average length" | awk '{print $4}'`
+        	file_name=`echo $f | rev | cut -f1 -d "/" | rev`
+        	file_name=${file_name%.stats*}
+	        echo -e "${file_name}\t${frag_length}\t${batch_id}" >> $merged_fragment
+    	done
 
 		# move FASTQC files
-		if [[ "$qc_flag" == "Y" ]]; then mv $cecret_batch_dir/fastqc/* $fastqc_dir; fi
+		mv $cecret_batch_dir/fastqc/* $fastqc_dir
 		
 		# move FASTA files
 		mv $cecret_batch_dir/consensus/* $fasta_dir/not_uploaded
@@ -434,41 +442,37 @@ fi
 # Create final reports
 #############################################################################################
 if [[ $flag_reporting == "Y" ]]; then
-	if [[ "$qc_flag" == "Y" ]]; then
-		#log
-		message_cmd_log "--Creating QC Report"
-		echo "---Starting time: `date`" >> $pipeline_log
-		echo "---Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
+	#log
+	message_cmd_log "--Creating QC Report"
+	echo "---Starting time: `date`" >> $pipeline_log
+	echo "---Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 
-             	# uploading, project name should be removed.
-                dir_list=($tmp_dir/unzipped/*)
-                for dir_id in ${dir_list[@]}; do
-                        for f in "$dir_id"; do
-                                # remove projectid from header
-                                sed -i "s/-$project_name_full//g" $f
+    # uploading, project name should be removed.
+    dir_list=($tmp_dir/unzipped/*)
+    for dir_id in ${dir_list[@]}; do
+        for f in "$dir_id"; do
+            # remove projectid from header
+            sed -i "s/-$project_name_full//g" $f
 
-                                # rename files
-                                new_id=`echo $f | awk -v p_id=-$project_name_full '{ gsub(p_id,"",$1) ; print }'`
-                                if [[ $f != $new_id ]]; then mv $f $new_id; fi
-                        done
-                done
+            # rename files
+            new_id=`echo $f | awk -v p_id=-$project_name_full '{ gsub(p_id,"",$1) ; print }'`
+            if [[ $f != $new_id ]]; then mv $f $new_id; fi
+        done
+    done
 
-		#-d -dd 1 adds dir name to sample name
-		multiqc -f -v \
-	    	-c $multiqc_config \
-		$fastqc_dir \
-		$tmp_dir/unzipped \
-		-o $qcreport_dir 2>&1 | tee -a $multiqc_log
+	#-d -dd 1 adds dir name to sample name
+	multiqc -f -v \
+	-c $multiqc_config \
+	$fastqc_dir \
+	$tmp_dir/unzipped \
+	-o $qcreport_dir 2>&1 | tee -a $multiqc_log
 	
-		#cleanup
-		mv $qcreport_dir/*html $qc_dir
-		rm -r $qcreport_dir
+	#cleanup
+	mv $qcreport_dir/*html $qc_dir
+	rm -r $qcreport_dir
 
-		#create fragment plot
-		python333 scripts/fragment_plots.py $merged_fragment $fragement_plot
-	else
-		rm -r $qc_dir
-	fi 
+	#create fragment plot
+	echo "python3 $fragment_plots_script $merged_fragment $fragement_plot"
 	
 	# merge batch outputs into intermediate files
 	# join contents of nextclade and pangolin into final output table	
