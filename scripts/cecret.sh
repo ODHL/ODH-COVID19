@@ -20,7 +20,7 @@ flag_testing=${8}
 flag_download="Y"
 flag_batch="Y"
 flag_cecret="Y"
-flag_cleanup="N"
+flag_cleanup="Y"
 flag_reporting="Y"
 
 ##########################################################
@@ -169,7 +169,8 @@ if [[ $flag_download == "Y" ]]; then
 
 	#get project id
 	project_id=`$config_basespace_cmd list projects --filter-term="${project_name_full}" | sed -n '4 p' | awk '{split($0,a,"|"); print a[3]}' | sed 's/ //g'`
-	
+	echo $config_basespace_cmd list projects --filter-term="${project_name_full}"
+
 	# if the project name does not match completely with basespace an ID number will not be found
 	# display all available ID's to re-run project	
 	if [ -z "$project_id" ]; then
@@ -183,7 +184,8 @@ if [[ $flag_download == "Y" ]]; then
 	
 	# run basespace download command
 	$config_basespace_cmd download project --quiet -i $project_id -o "$tmp_dir" --extension=zip
-	echo $config_basespace_cmd list projects --filter-term="${project_name_full}" 
+	echo
+	echo $config_basespace_cmd download project --quiet -i $project_id -o "$tmp_dir" --extension=zip
 
 	# output end message
 	echo "---Ending time: `date`" >> $pipeline_log
@@ -407,7 +409,7 @@ if [[ $flag_cecret == "Y" ]]; then
 		#add to master nextclade results
 		cat $cecret_batch_dir/nextclade/nextclade.csv >> $merged_nextclade
 
-	    	#add to master pangolin results
+	    #add to master pangolin results
 		cat $cecret_batch_dir/pangolin/lineage_report.csv >> $merged_pangolin
 
 		#add to master cecret summary
@@ -430,6 +432,7 @@ if [[ $flag_cecret == "Y" ]]; then
 		#remove intermediate files
 		if [[ $flag_cleanup == "Y" ]]; then
 			sudo rm -r --force work
+			sudo rm -r --force */work
 			sudo rm -r --force $cecret_batch_dir
 			sudo rm -r --force $fastq_batch_dir
 			cd ..

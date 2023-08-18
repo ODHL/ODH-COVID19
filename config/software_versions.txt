@@ -8,6 +8,7 @@ pangolin	23	4.1.3-pdata-1.15.1
 pangolin	24	4.1.3-pdata-1.16
 pangolin	25	4.1.3-pdata-1.17
 pangolin    26  4.3-pdata-1.20
+pangolin    27  4.3-pdata-1.21
 nextclade	1	1.9.0
 nextclade	2	1.10.2
 nextclade	3	1.10.3
