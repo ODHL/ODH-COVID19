@@ -184,7 +184,6 @@ if [[ $flag_download == "Y" ]]; then
 	
 	# run basespace download command
 	$config_basespace_cmd download project --quiet -i $project_id -o "$tmp_dir" --extension=zip
-	echo
 	echo $config_basespace_cmd download project --quiet -i $project_id -o "$tmp_dir" --extension=zip
 
 	# output end message
@@ -213,8 +212,8 @@ if [[ $flag_batch == "Y" ]]; then
 		# create sample_id file - grab all files in dir, split by _, exclude noro- file names
 		## pulls name after _
 		# ls $tmp_dir | grep "ds"| cut -f2 -d "_" | grep -v "noro.*" > $sample_id_file
-		## pulls name before _
-		ls $tmp_dir | grep "ds"| cut -f1 -d "_" | grep -v "noro.*" > $sample_id_file
+		## pulls name before _[0-9]
+		ls $tmp_dir | grep "ds" | grep -v "noro" | awk -F"_[0-9]" '{print $1}' > $sample_id_file
 
     	#read in text file with all project id's
     	IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file
@@ -354,7 +353,7 @@ if [[ $flag_cecret == "Y" ]]; then
     		if [[ ! -d "$tmp_dir/${sample_id}" ]]; then mkdir $tmp_dir/${sample_id}; fi
 			
 			#unzip analysis file downloaded from DRAGEN to sample tmp dir - used in QC
-			unzip -o -q $tmp_dir/${sample_id}_[0-9]*/*_all_output_files.zip -d $tmp_dir/${sample_id}
+			unzip -o -q $tmp_dir/${sample_id}_*/*_all_output_files.zip -d $tmp_dir/${sample_id}
 
 	    	#move needed files to general tmp dir
 			mv $tmp_dir/${sample_id}/ma/* $tmp_dir/unzipped
@@ -371,8 +370,8 @@ if [[ $flag_cecret == "Y" ]]; then
 		echo "-------Starting time: `date`" >> $pipeline_log
     	echo "-------Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 	
-		# changes in software adds project name to some sample_ids. In order to ensure consistency throughout naming and for downstream
-        # uploading, project name should be removed.
+		# changes in software adds project name to some sample_ids. In order to ensure consistency throughout naming 
+		# and for downstream uploading, project name should be removed.
     	dir_list=($fastq_batch_dir/*)
     	for dir_id in ${dir_list[@]}; do
             for f in "$dir_id"; do

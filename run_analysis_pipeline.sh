@@ -235,7 +235,7 @@ elif [[ "$pipeline" == "gisaid" ]]; then
         bash scripts/gisaid.sh "${output_dir}" "${project_id}" "${pipeline_config}" "${final_results}" "${reject_flag}" 2>> "$pipeline_log"
         
 	    # run stats
-        bash run_analysis_pipeline.sh -m stats -n $project_id
+        # bash run_analysis_pipeline.sh -m stats -n $project_id
 	else
 		# determine number of samples
 		sample_number=`cat reject_search.csv | wc -l`

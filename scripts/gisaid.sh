@@ -113,7 +113,8 @@ if [[ "$pipeline_prep" == "Y" ]]; then
         # the sample - screen and move any sample with N>50 to
         # failed folder and add to list
 		percent_n_calc=$(($n_num*100/$total_num))
-        if [[ $percent_n_calc > $config_percent_n_cutoff ]]; then
+        if [[ $percent_n_calc -gt 50 ]]; then
+			echo "--sample failed N check: $f at ${percent_n_calc}%_Ns"
 			short_f=`echo $f | sed "s/.consensus.fa//"`
 			echo "$short_f,qc_fail,qc_${percent_n_calc}%_Ns" >> $gisaid_results
             mv "$full_path" "$fasta_failed"/"${sample_id}.fa"
