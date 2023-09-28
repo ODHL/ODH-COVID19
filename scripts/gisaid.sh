@@ -132,7 +132,7 @@ if [[ "$pipeline_prep" == "Y" ]]; then
                 collection_yr=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[3]}' | tr -d '"'`
                 collection_mn=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[1]}' | tr -d '"'`
                 collection_dy=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[2]}' | tr -d '"'`
-				if [[ $collection_mn -lt 9 ]]; then collection_mn="0$collection_mn"; fi
+				if [[ $collection_mn -lt 10 ]]; then collection_mn="0$collection_mn"; fi
                 if [[ $collection_dy -lt 9 ]]; then collection_dy="0$collection_dy"; fi
                 collection_date=${collection_yr}-${collection_mn}-${collection_dy}
 
@@ -141,7 +141,7 @@ if [[ "$pipeline_prep" == "Y" ]]; then
                 # year must be the collection year and not the analysis or sequencing year
 				# cut_id will be 2021064775 --> 1064775 OR 2022064775 --> 2064775 OR 2020064775 --> 1064775
 				year=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[3]}' | tr -d '"'`
-                cut_id=`echo $sample_id | awk '{ gsub("2020","1") gsub("202",""); print $0}'`
+                cut_id=`echo $sample_id | awk '{ gsub("2020","1") gsub("2022","2") gsub("2023","3"); print $0}'`
                 virus_name="hCoV-19/USA/OH-ODH-SC$cut_id/$year"
 
                 #e.g. Europe / Germany / Bavaria / Munich

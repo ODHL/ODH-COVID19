@@ -17,11 +17,40 @@ flag_testing=${8}
 ## N = run full run
 ## T = run 2 batches, 4 samples
 ## U = run user generated manifest
-flag_download="Y"
-flag_batch="Y"
-flag_cecret="Y"
-flag_cleanup="Y"
-flag_reporting="Y"
+if [[ $flag_testing == "DOWNLOAD" ]]; then
+	flag_download="Y"
+	flag_batch="N"
+	flag_cecret="N"
+	flag_cleanup="N"
+	flag_reporting="N"
+elif [[ $flag_testing == "BATCH" ]]; then
+        flag_download="N"
+        flag_batch="Y"
+        flag_cecret="N"
+        flag_cleanup="N"
+        flag_reporting="N"
+elif [[ $flag_testing == "RUNONLY" ]]; then
+        flag_download="N"
+        flag_batch="N"
+        flag_cecret="Y"
+        flag_cleanup="N"
+        flag_reporting="N"
+elif [[ $flag_testing == "CLEANREPORT" ]]; then
+        flag_download="N"
+        flag_batch="N"
+        flag_cecret="N"
+        flag_cleanup="Y"
+        flag_reporting="Y"
+elif [[ $flag_testing == "ALL" ]]; then
+	flag_download="Y"
+        flag_batch="Y"
+        flag_cecret="Y"
+        flag_cleanup="Y"
+        flag_reporting="Y"
+else
+	echo "CHOOSE CORRECT FLAG: DOWNLOAD BATCH RUNONLY CLEANREPORT ALL"
+	EXIT
+fi
 
 ##########################################################
 # Eval, source
