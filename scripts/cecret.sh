@@ -8,7 +8,7 @@ cecret_config=$4
 multiqc_config=$5
 date_stamp=$6
 pipeline_log=$7
-flag_testing=${8}
+flag_testing=$8
 
 #########################################################
 # Pipeline controls
@@ -43,12 +43,13 @@ elif [[ $flag_testing == "CLEANREPORT" ]]; then
         flag_reporting="Y"
 elif [[ $flag_testing == "ALL" ]]; then
 	flag_download="Y"
-        flag_batch="Y"
-        flag_cecret="Y"
-        flag_cleanup="Y"
-        flag_reporting="Y"
+    flag_batch="Y"
+    flag_cecret="Y"
+    flag_cleanup="Y"
+    flag_reporting="Y"
 else
-	echo "CHOOSE CORRECT FLAG: DOWNLOAD BATCH RUNONLY CLEANREPORT ALL"
+	echo "CHOOSE CORRECT FLAG -t: DOWNLOAD BATCH RUNONLY CLEANREPORT ALL"
+	echo "YOU CHOOSE: $flag_testing"
 	EXIT
 fi
 
@@ -212,8 +213,8 @@ if [[ $flag_download == "Y" ]]; then
 	echo "---Starting time: `date`" >> $pipeline_log
 	
 	# run basespace download command
-	$config_basespace_cmd download project --quiet -i $project_id -o "$tmp_dir" --extension=zip
 	echo $config_basespace_cmd download project --quiet -i $project_id -o "$tmp_dir" --extension=zip
+	$config_basespace_cmd download project --quiet -i $project_id -o "$tmp_dir" --extension=zip
 
 	# output end message
 	echo "---Ending time: `date`" >> $pipeline_log
