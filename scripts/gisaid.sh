@@ -72,19 +72,22 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 	touch $gisaid_results
 	touch $gisaid_log
 
-	# remove projectID from with fastq files, file names
+	# clean metadata file
+	sed -i "s/ //g" $metadata_file
+
+	# remove projectID-SARS from with fastq files, file names
 	for f in ~/output/$project_id/analysis/fasta/not_uploaded/*; do
-		sed -i "s/-${project_id}//g" $f
-		old_name=`echo $f | cut -f9 -d"/"`
-		new_name=`echo $f | cut -f9 -d"/" | cut -f1 -d"-"`
-		new_f="~/output/$project_id/analysis/fasta/not_uploaded/$new_name"
-		if [[ $old_name != $new_name ]]; then mv $f $new_f; fi
+		new_name=`sed -i "s/-${project_id}-SARS//g" $f`
+		mv $f $new_name
 	done
 
-	# remove projectID from intermed files, final file
-	for f in ~/output/$project_id/analysis/intermed/*; do sed -i "s/-${project_id}//g" $f; done
-	sed -i "s/-${project_id}//g" ~/output/$project_id/analysis/final*
+	# remove projectID-SARS from intermed files, final file
+	for f in ~/output/$project_id/analysis/intermed/*; do sed -i "s/-${project_id}-SARS//g" $f; done
+	sed -i "s/-${project_id}-SARS//g" ~/output/$project_id/analysis/final*
 	
+	# remove projectID-SARS or projectID_SARS from log files
+	for f in ~/output/$project_id/logs/*; do sed -i "s/-${project_id}-SARS//g" $f; sed -i "s/${project_id}_SARS//g" $f; done
+
     # Create manifest for upload
 	# second line is needed for manual upload to gisaid website, but not required for CLI upload
     echo "submitter,fn,covv_virus_name,covv_type,covv_passage,covv_collection_date,covv_location,covv_add_location,covv_host,covv_add_host_info,covv_sampling_strategy,covv_gender,covv_patient_age,covv_patient_status,covv_specimen,covv_outbreak,covv_last_vaccinated,covv_treatment,covv_seq_technology,covv_assembly_method,covv_coverage,covv_orig_lab,covv_orig_lab_addr,covv_provider_sample_id,covv_subm_lab,covv_subm_lab_addr,covv_subm_sample_id,covv_authors,covv_comment,comment_type" > $batched_meta
@@ -133,7 +136,7 @@ if [[ "$pipeline_prep" == "Y" ]]; then
                 collection_mn=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[1]}' | tr -d '"'`
                 collection_dy=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[2]}' | tr -d '"'`
 				if [[ $collection_mn -lt 10 ]]; then collection_mn="0$collection_mn"; fi
-                if [[ $collection_dy -lt 9 ]]; then collection_dy="0$collection_dy"; fi
+                if [[ $collection_dy -lt 10 ]]; then collection_dy="0$collection_dy"; fi
                 collection_date=${collection_yr}-${collection_mn}-${collection_dy}
 
 				# take header (IE 2021064775) and turn into correct version hCoV-19/USA/OH-xxx/YYYY
