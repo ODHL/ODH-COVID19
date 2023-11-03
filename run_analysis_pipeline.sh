@@ -153,7 +153,7 @@ if [[ "$pipeline" == "init" ]]; then
 	done
 
 	#update metadata name
-	sed -i "s/merged_complete.csv/metadata_${project_name}.csv/" "${log_dir}/config_pipeline.yaml" 
+	sed -i "s/metadata.csv/metadata_${project_name}.csv/" "${log_dir}/config_pipeline.yaml" 
 
   	#output
 	echo -e "Configs are ready to be edited:\n${log_dir}"
