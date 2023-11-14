@@ -14,36 +14,23 @@
 # https://github.com/UPHL-BioNGS/Cecret
 
 #############################################################################################
-# functions
+# helper functions
 #############################################################################################
 
 helpFunction()
 {
    echo ""
-   echo "Usage: $1 -m [REQUIRED]pipeline mode options"
-   echo -e "\t-m options: init, cecret, gisaid, ncbi, stat, update"
+   echo "Usage: $1 -r [REQUIRED] runmode"
+   echo -e "\t-r options: init, cecret, gisaid, ncbi, stat"
    echo "Usage: $2 -n [REQUIRED] project_id"
    echo -e "\t-n project id"
-   echo "Usage: $3 -t [OPTIONAL] testing_flag"
-   echo -e "\t-t Y,N option to run test settings (default N,U,G)"   
-   echo "Usage: $4 -r [OPTIONAL] reject_flag"
-   echo -e "\t-r Y,N option to run GISAID rejected sample processing (default N)"
+   echo "Usage: $3 -s [OPTIONAL] subworkflow options"
+   echo -e "\t-s DOWNLOAD, BATCH, CECRET, ALL"   
+   echo "Usage: $4 -r [OPTIONAL] resume options"
+   echo -e "\t-r Y,N option to resume -p GISAID workflow in progress"
    exit 1 # Exit script after printing help
 }
 
-check_initialization(){
-  if [[ ! -d $log_dir ]] || [[ ! -f "$pipeline_config" ]]; then
-    echo "ERROR: You must initalize the dir before beginning pipeline"
-    exit 1
-  fi
-}
-
-# source global functions
-source $(dirname "$0")/scripts/functions.sh
-
-#############################################################################################
-# helper function
-#############################################################################################
 while getopts "m:n:t:r:" opt
 do
    case "$opt" in
@@ -62,6 +49,19 @@ if [ -z "$pipeline" ] || [ -z "$project_id" ]; then
 fi
 
 #############################################################################################
+# other functions
+#############################################################################################
+check_initialization(){
+  if [[ ! -d $log_dir ]] || [[ ! -f "$pipeline_config" ]]; then
+    echo "ERROR: You must initalize the dir before beginning pipeline"
+    exit 1
+  fi
+}
+
+# source global functions
+source $(dirname "$0")/scripts/functions.sh
+
+#############################################################################################
 # args
 #############################################################################################
 # Remove trailing / to project_name if it exists
@@ -70,43 +70,40 @@ fi
 # To ensure consistency in all projects, remove all information after _
 project_name_full=$(echo $project_id | sed 's:/*$::')
 project_name=$(echo $project_id | cut -f1 -d "_" | cut -f1 -d " ")
-output_dir="/home/ubuntu/output/$project_name"
 
 #set defaults for optional args
 if [ -z "$testing_flag" ]; then testing_flag="N"; fi
 if [ -z "$partial_flag" ]; then partial_flag="N"; fi
 if [ -z "$reject_flag" ]; then reject_flag="N"; fi
 
+# set date
+date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
+
 #############################################################################################
 # Dir, Configs
 #############################################################################################
 # set dirs
+output_dir="/home/ubuntu/output/$project_name"
 log_dir=$output_dir/logs
-
-qc_dir=$output_dir/qc
-
-tmp_dir=$output_dir/tmp
-
 analysis_dir=$output_dir/analysis
 
+# analysis dirs
 fasta_dir=$analysis_dir/fasta
 intermed_dir=$analysis_dir/intermed
+final_results=$analysis_dir/final_results_$date_stamp.csv
 
-ncbi_hold="../ncbi_hold/$project_id"
-
-#set log files
+# log dirs
+qc_dir=$output_dir/qc
 pipeline_log=$log_dir/pipeline_log.txt
-
-#set configs
 multiqc_config="$log_dir/config_multiqc.yaml"
 pipeline_config="$log_dir/config_pipeline.yaml"
 cecret_config="$log_dir/config_cecret.config"
 
-# set date
-date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
+# tmp dir
+tmp_dir=$output_dir/tmp
 
-# set final file
-final_results=$analysis_dir/final_results_$date_stamp.csv
+# ncbi dir to hold until completion of sampling
+ncbi_hold="../ncbi_hold/$project_id"
 
 #############################################################################################
 # Run CECRET
@@ -121,26 +118,22 @@ if [[ "$pipeline" == "init" ]]; then
     if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
 
     ##parent
-	dir_list=(logs fastq cecret qc tmp analysis)
+	dir_list=(logs rawdata cecret tmp analysis)
     for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/$pd ]]; then mkdir -p $output_dir/$pd; fi; done
-
-    ##qc
-    dir_list=(covid19_qcreport)
-    for pd in "${dir_list[@]}"; do if [[ ! -d $qc_dir/$pd ]]; then mkdir -p $qc_dir/$pd; fi; done
 
     ##tmp
     dir_list=(fastqc unzipped)
     for pd in "${dir_list[@]}"; do if [[ ! -d $tmp_dir/$pd ]]; then mkdir -p $tmp_dir/$pd; fi; done
 
     ##analysis
-    dir_list=(fasta intermed)
+    dir_list=(fasta intermed qc reports)
     for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi; done
 
-	##gisaid/ncbi
-	dir_list=(not_uploaded upload_complete upload_partial upload_failed)
+	dir_list=(not_uploaded gisaid_complete upload_failed)
+	##fasta
     for pd in "${dir_list[@]}"; do if [[ ! -d $fasta_dir/$pd ]]; then mkdir -p $fasta_dir/$pd; fi; done
 
-    ##make files
+    ##log file
     touch $pipeline_log
 
 	# copy config inputs to edit if doesn't exit
