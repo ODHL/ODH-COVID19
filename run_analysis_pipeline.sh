@@ -118,42 +118,42 @@ if [[ "$pipeline" == "init" ]]; then
 	echo "*** INITIALIZING PIPELINE ***"
 
 	#make directories, logs
-        if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
+    if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
 
-        ##parent
-        dir_list=(logs fastq cecret qc tmp analysis)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/$pd ]]; then mkdir -p $output_dir/$pd; fi; done
+    ##parent
+	dir_list=(logs fastq cecret qc tmp analysis)
+    for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/$pd ]]; then mkdir -p $output_dir/$pd; fi; done
 
-        ##qc
-        dir_list=(covid19_qcreport)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $qc_dir/$pd ]]; then mkdir -p $qc_dir/$pd; fi; done
+    ##qc
+    dir_list=(covid19_qcreport)
+    for pd in "${dir_list[@]}"; do if [[ ! -d $qc_dir/$pd ]]; then mkdir -p $qc_dir/$pd; fi; done
 
-        ##tmp
-        dir_list=(fastqc unzipped)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $tmp_dir/$pd ]]; then mkdir -p $tmp_dir/$pd; fi; done
+    ##tmp
+    dir_list=(fastqc unzipped)
+    for pd in "${dir_list[@]}"; do if [[ ! -d $tmp_dir/$pd ]]; then mkdir -p $tmp_dir/$pd; fi; done
 
-        ##analysis
-        dir_list=(fasta intermed)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi; done
+    ##analysis
+    dir_list=(fasta intermed)
+    for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi; done
 
 	##gisaid/ncbi
 	dir_list=(not_uploaded upload_complete upload_partial upload_failed)
-        for pd in "${dir_list[@]}"; do if [[ ! -d $fasta_dir/$pd ]]; then mkdir -p $fasta_dir/$pd; fi; done
+    for pd in "${dir_list[@]}"; do if [[ ! -d $fasta_dir/$pd ]]; then mkdir -p $fasta_dir/$pd; fi; done
 
-        ##make files
-        touch $pipeline_log
+    ##make files
+    touch $pipeline_log
 
 	# copy config inputs to edit if doesn't exit
 	files_save=("config/config_pipeline.yaml" "config/config_cecret.config" "config/config_multiqc.yaml")
   	for f in ${files_save[@]}; do
-        	IFS='/' read -r -a strarr <<< "$f"
-        	if [[ ! -f "${log_dir}/${strarr[1]}" ]]; then
-                	cp $f "${log_dir}/${strarr[1]}"
+        IFS='/' read -r -a strarr <<< "$f"
+    	if [[ ! -f "${log_dir}/${strarr[1]}" ]]; then
+            cp $f "${log_dir}/${strarr[1]}"
 		fi
 	done
 
 	#update metadata name
-	sed -i "s/metadata.csv/metadata_${project_name}.csv/" "${log_dir}/config_pipeline.yaml" 
+	sed -i "s~metadata.csv~${log_dir}/metadata-${project_name}.csv~" "${log_dir}/config_pipeline.yaml" 
 
   	#output
 	echo -e "Configs are ready to be edited:\n${log_dir}"
@@ -162,24 +162,24 @@ if [[ "$pipeline" == "init" ]]; then
 
 elif [[ "$pipeline" == "update" ]]; then
 
-        #update the staphb toolkit
-        staphb-tk --auto_update
+    #update the staphb toolkit
+    staphb-tk --auto_update
 
 elif [[ "$pipeline" == "cecret" ]]; then
 	
 	#############################################################################################
-    	# Run CECRET pipeline
-    	#############################################################################################
+    # Run CECRET pipeline
+	#############################################################################################
    	message_cmd_log "------------------------------------------------------------------------"
-    	message_cmd_log "--- STARTING CECRET PIPELINE ---"
+    message_cmd_log "--- STARTING CECRET PIPELINE ---"
 
 	# check initialization was completed
 	check_initialization
 	
-    	# Eval YAML args
+    # Eval YAML args
 	date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
 
-    	# run pipelien
+    # run pipelien
 	bash scripts/cecret.sh \
 		"${output_dir}" \
 		"${project_name_full}" \
@@ -202,8 +202,8 @@ elif [[ "$pipeline" == "gisaid" ]]; then
 	eval $(parse_yaml ${pipeline_config} "config_")
 
 	############################################################################################
-        # Run GISAID UPLOAD
-        #############################################################################################
+    # Run GISAID UPLOAD
+    #############################################################################################
 	if [[ $reject_flag == "N" ]]; then
 		message_cmd_log "------------------------------------------------------------------------"
 		message_cmd_log "--- STARTING GISAID PIPELINE ---"
@@ -282,7 +282,7 @@ elif [[ "$pipeline" == "gisaid" ]]; then
 			done < reject_find.csv
 
 			#log 
-	                echo "--analyzing rejected samples" >> $pipeline_log
+	        echo "--analyzing rejected samples" >> $pipeline_log
 			rm $reject_tmp
 		else
 			echo "Number of files does not match samples. Review log"
@@ -334,8 +334,8 @@ elif [[ "$pipeline" == "ncbi" ]]; then
 		final="metadata-processed-ok.tsv"
 		for f in $ncbi_hold/complete/metadata*ok*; do
 			if [[ ! -f $header ]]; then head -n1 $f > $header; fi
-    			if [[ ! -f $joined ]]; then touch $joined; fi
-    			cat $f >> $joined
+    		if [[ ! -f $joined ]]; then touch $joined; fi
+    		cat $f >> $joined
 			
 			# rename the file
 			new_name=`echo $f | sed "s/-processed-ok//g"`
@@ -385,8 +385,8 @@ elif [[ "$pipeline" == "stats" ]]; then
     val2=`cat $final_results | grep "missing" | wc -l`
     message_stats_log "----Number missing metadata: $val2"
     if [[ $val2 -gt 0 ]]; then
-        cat $intermed_dir/gisaid_results.csv | grep "missing" > $log_dir/missing_metadata.csv
-       sed -i "s/gisaid_fail/$project_id/g" $log_dir/missing_metadata.csv
+    	cat $intermed_dir/gisaid_results.csv | grep "missing" > $log_dir/missing_metadata.csv
+    	sed -i "s/gisaid_fail/$project_id/g" $log_dir/missing_metadata.csv
     fi
 	
 	val=$((val-val1-val2))

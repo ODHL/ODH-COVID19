@@ -73,20 +73,22 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 	touch $gisaid_log
 
 	# clean metadata file
-	sed -i "s/ //g" $metadata_file
+	sed -i "s/ //g" $config_metadata_file
 
 	# remove projectID-SARS from with fastq files, file names
 	for f in ~/output/$project_id/analysis/fasta/not_uploaded/*; do
-		new_name=`sed -i "s/-${project_id}-SARS//g" $f`
+		new_name=`sed -i "s/-${project_id}[-_]SARS//g" $f`
 		mv $f $new_name
 	done
 
 	# remove projectID-SARS from intermed files, final file
-	for f in ~/output/$project_id/analysis/intermed/*; do sed -i "s/-${project_id}-SARS//g" $f; done
-	sed -i "s/-${project_id}-SARS//g" ~/output/$project_id/analysis/final*
+	for f in ~/output/$project_id/analysis/intermed/*; do sed -i "s/-${project_id}*SARS//g" $f; done
+	sed -i "s/-${project_id}*SARS//g" ~/output/$project_id/analysis/final*
 	
 	# remove projectID-SARS or projectID_SARS from log files
-	for f in ~/output/$project_id/logs/*; do sed -i "s/-${project_id}-SARS//g" $f; sed -i "s/${project_id}_SARS//g" $f; done
+	for f in ~/output/$project_id/logs/*; do 
+		sed -i "s/-${project_id}*SARS//g" $f
+	done
 
     # Create manifest for upload
 	# second line is needed for manual upload to gisaid website, but not required for CLI upload
@@ -99,7 +101,7 @@ if [[ "$pipeline_prep" == "Y" ]]; then
         #if header has a / then rearraign, otherwise use header
         full_path="$fasta_notuploaded"/$f
         full_header=`cat "$full_path" | grep ">"`
-        sample_id=`echo $full_header | awk '{ gsub(">", "")  gsub("SC", "") gsub("Consensus_","") \
+        sample_id=`echo $full_header | awk '{ gsub(">", "")  gsub("SC", "") gsub("Consensus_","") gsub(".SARS","")\
 		gsub("[.]consensus_threshold_[0-9].[0-9]_quality_[0-9].*","") gsub(" ","") gsub(".consensus.fa","") gsub(".fa",""); print $0}'`
                 
 		# determine total number of seq
