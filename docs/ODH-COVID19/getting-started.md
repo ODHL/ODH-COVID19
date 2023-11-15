@@ -1,54 +1,30 @@
 ### Initialization
-Deployment of run features (CECRET, GISAID, NCBI) requires the initalization of the pipeline. This step will create the directory structure needed for the pipeline, will create log files for documentation and will copy the necessary manifests and config files to their appropriate locations for pipeline control.
+Deployment of the analysis workflow (`-p sarscov2`) requires the initalization of the pipeline. This step will create the directory structure needed for the pipeline, will create log files for documentation and will copy the necessary manifests and config files to their appropriate locations for pipeline control.
 
 1. Change working directory to the analysis pipeline directory
-2. Select the initialization flag (-r init) on the project (-n name_of_project)
+2. Run initialization
 
 ```
+cd worflows/SARS_CoV_2_Workflow
 
-cd analysis_pipeline
-
-bash run_analysis_pipeline.sh -m init -n name_of_project
+bash run_analysis_pipeline.sh -p init -n name_of_project
 
 ```
-
-Initialization output:
--- /name_of_project/
----- /analysis/
------- /fasta/
--------- /not_uploaded/
--------- /uploaded/
--------- /partial_upload/
--------- /failed/
------- /intermed/
----- /cecret/
----- /fastq/
----- /logs/
------- config_cecret.config
------- config_multiqc.yaml
------- config_pipeline.yaml
------- gisaid_log.txt
------- pipeline_log.txt
------- /qc/
--------- covid19_qcreport
------- /tmp/
--------- fastqc
--------- unzipped
 
 ### Configuration Files
 After completion of the initialization step, configuration files may be edited according to the project. These include:
 
 #### 1. PIPELINE Config
 - Description: This configuration file controls all metadata associated with the project, as well as pipeline specific parameters. Within this configuration file software versions can be selected and batch size can be controlled. GISAID-related parameters (optional and required) are also included in this configuration file.
-- Location: /name_of_project/logs/config_pipeline.yaml
+- Location: /name_of_project/logs/config/config_pipeline.yaml
 
 #### 2. CECRET Config
 - Description: This configuration file controls all the features associated with the CECRET workflow.
-- Location: /name_of_project/logs/config_cecret.config
+- Location: /name_of_project/logs/config/config_cecret.config
 
 #### 3. MULTIQC Config
 -  Description: This configuration file controls all the features associated with the MULTIQC report generated upon pipeline completion.
-- Location: /name_of_project/logs/config_multiqc.yaml
+- Location: /name_of_project/logs/config/config_multiqc.yaml
 
 
 ## Configuration Files
@@ -76,8 +52,6 @@ After completion of the initialization step, configuration files may be edited a
    - Assembly method: CLC Genomics Workbench 12, Geneious 10.2.4, SPAdes/MEGAHIT v1.2.9, UGENE v. 33, etc.
    - Coverage: 70x, 1,000x, 10,000x (average)
 
-   
- 
 ## Software
 ### GISAID specific features
 GISAID CLI requires authentication. Authentication must be performed every 100 days. 

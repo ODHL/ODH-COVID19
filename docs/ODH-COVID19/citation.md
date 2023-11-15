@@ -1,1 +1,3 @@
-citation here
+- [Nextflow](https://www.nextflow.io/docs/latest/getstarted.html)
+- [Singularity](https://singularity.lbl.gov/install-linux) or [Docker](https://docs.docker.com/get-docker/) - set the profile as singularity or docker during runtime
+- [Cecret](https://github.com/UPHL-BioNGS/Cecret/blob/master/README.md)
