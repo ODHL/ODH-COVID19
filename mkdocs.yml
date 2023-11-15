@@ -96,10 +96,10 @@ nav:
   - Background : index.md
   - Usage: 
     - 1. Getting Started : ODH-COVID19/getting-started.md
-    - 2. CECRET: ODH-COVID19/cecret.md
+    - 2. Analysis: ODH-COVID19/analysis.md
     - 3. GISAID: ODH-COVID19/gisaid.md
     - 4. NCBI: ODH-COVID19/ncbi.md
-    - 5. MAINTENANCE: ODH-COVID19/maintenance.md
+    - 5. Maintenance: ODH-COVID19/maintenance.md
   - FAQ:
     - Troubleshooting: ODH-COVID19/troubleshooting.md
     - Citation: ODH-COVID19/citation.md
