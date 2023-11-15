@@ -3,3 +3,6 @@ bin/
 
 # ignore upload dir
 gisaid_upload/
+
+# ignore mkdocs site
+site/*
