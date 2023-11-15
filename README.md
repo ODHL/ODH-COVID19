@@ -47,7 +47,8 @@ This pipeline performs the following steps:
 1. Outputs stats from QC, GISAID, and NCBI uploads to command line
 
 ### Help
-Review the GitHub [pages](https://slsevilla.github.io/ODH-COVID19/ODH-COVID19/maintenance/) documentation for more help!
+Review the [UserGuiden](https://odhl.github.io/SARS_CoV_2_Workflow/) documentation for more help!
+```
 Usage:  -p [REQUIRED] pipeline runmode
         -p options: init, sarscov2, gisaid, ncbi, stat, update
 Usage:  -n [REQUIRED] project_id
@@ -58,6 +59,7 @@ Usage:  -r [OPTIONAL] resume options
         -r Y,N option to resume `-p sarscov2` workflow in progress
 Usage:  -t [OPTIONAL] testing options
         -t Y,N option to run test in `-p sarscov2` workflow
+```
 
 ### Authors
 This pipeline was created by Samantha Sevilla Chill, for support of work at the Ohio Department of Health Public Laboratory.

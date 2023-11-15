@@ -57,11 +57,14 @@ elif [[ $subworkflow == "QC" ]]; then
 	pipeline_prep="N"
 	pipeline_upload="N"
 	pipeline_qc="Y"
+elif [[ $subworkflow == "ALL" ]]; then
+	pipeline_prep="Y"
+	pipeline_upload="Y"
+	pipeline_qc="Y"
 else
-	echo "skipped $subworkflow"
-	pipeline_prep="N"
-	pipeline_upload="N"
-	pipeline_qc="N"
+	echo "CHOOSE CORRECT FLAG -s: PREP UPLOAD QC ALL"
+	echo "YOU CHOOSE: $subworkflow"
+	EXIT
 fi
 
 #########################################################
