@@ -5,7 +5,7 @@ output_dir=$1
 project_id=$2
 pipeline_config=$3
 final_results=$4
-reject_flag=$5
+subworkflow=$5
 
 #########################################################
 # Eval, source
@@ -21,22 +21,22 @@ date_stamp=`date '+%Y_%m_%d'`
 
 # set dirs
 fasta_notuploaded=$output_dir/analysis/fasta/not_uploaded
-fasta_uploaded=$output_dir/analysis/fasta/upload_partial
+fasta_uploaded=$output_dir/analysis/fasta/gisaid_complete
 fasta_failed=$output_dir/analysis/fasta/upload_failed
 log_dir=$output_dir/logs
 pipeline_log=$log_dir/pipeline_log.txt
 
 # set files
-gisaid_log="$log_dir/gisaid_log_${project_id}_${date_stamp}.txt"
-gisaid_failed="$log_dir/gisaid_failed_${project_id}_${date_stamp}.txt"
+gisaid_log="$log_dir/gisaid/gisaid_log_${project_id}_${date_stamp}.txt"
+gisaid_failed="$log_dir/gisaid/gisaid_failed_${project_id}_${date_stamp}.txt"
 gisaid_results="$output_dir/analysis/intermed/gisaid_results.csv"
-gisaid_rejected="$output_dir/analysis/intermed/gisaid_rejected_tmp.csv"
+pre_gisaid="$output_dir/analysis/intermed/final_results_preupload.csv"
 
 FASTA_filename="batched_fasta_${project_id}_${date_stamp}.fasta"
-batched_fasta="$log_dir/$FASTA_filename"
+batched_fasta="$log_dir/gisaid/$FASTA_filename"
 
 meta_filename="batched_meta_${project_id}_${date_stamp}.csv"
-batched_meta="$log_dir/$meta_filename"
+batched_meta="$log_dir/gisaid/$meta_filename"
 
 # set gisaid ID
 gisaid_auth="${config_gisaid_auth}"
@@ -45,73 +45,59 @@ gisaid_auth="${config_gisaid_auth}"
 # Controls
 #########################################################
 # to run cleanup of frameshift samples, pass frameshift_flag
-if [[ $reject_flag == "N" ]]; then
+if [[ $subworkflow == "PREP" ]]; then
 	pipeline_prep="Y"
+	pipeline_upload="N"
+	pipeline_qc="N"
+elif [[ $subworkflow == "UPLOAD" ]]; then
+	pipeline_prep="N"
 	pipeline_upload="Y"
+	pipeline_qc="N"
+elif [[ $subworkflow == "QC" ]]; then
+	pipeline_prep="N"
+	pipeline_upload="N"
 	pipeline_qc="Y"
-	pipeline_rejected="N"
 else
+	echo "skipped $subworkflow"
 	pipeline_prep="N"
 	pipeline_upload="N"
 	pipeline_qc="N"
-	pipeline_rejected="Y"
 fi
 
 #########################################################
 # Code
 #########################################################
 if [[ "$pipeline_prep" == "Y" ]]; then
-    echo "Ending time: `date`" >> $pipeline_log
 	echo "----PREPARING FILES"
+    echo "Ending time: `date`" >> $pipeline_log
 	
 	# create files
     if [[ -f $batched_meta ]]; then rm $batched_meta; fi
     if [[ -f $gisaid_results ]]; then rm $gisaid_results; fi
     if [[ -f $batched_fasta ]]; then rm $batched_fasta; fi
-	touch $batched_fasta
-	touch $gisaid_results
-	touch $gisaid_log
 
 	# clean metadata file
 	sed -i "s/ //g" $config_metadata_file
-
-	# remove projectID-SARS from with fastq files, file names
-	for f in ~/output/$project_id/analysis/fasta/not_uploaded/*; do
-		new_name=`sed -i "s/-${project_id}[-_]SARS//g" $f`
-		mv $f $new_name
-	done
-
-	# remove projectID-SARS from intermed files, final file
-	for f in ~/output/$project_id/analysis/intermed/*; do sed -i "s/-${project_id}*SARS//g" $f; done
-	sed -i "s/-${project_id}*SARS//g" ~/output/$project_id/analysis/final*
-	
-	# remove projectID-SARS or projectID_SARS from log files
-	for f in ~/output/$project_id/logs/*; do 
-		sed -i "s/-${project_id}*SARS//g" $f
-	done
 
     # Create manifest for upload
 	# second line is needed for manual upload to gisaid website, but not required for CLI upload
     echo "submitter,fn,covv_virus_name,covv_type,covv_passage,covv_collection_date,covv_location,covv_add_location,covv_host,covv_add_host_info,covv_sampling_strategy,covv_gender,covv_patient_age,covv_patient_status,covv_specimen,covv_outbreak,covv_last_vaccinated,covv_treatment,covv_seq_technology,covv_assembly_method,covv_coverage,covv_orig_lab,covv_orig_lab_addr,covv_provider_sample_id,covv_subm_lab,covv_subm_lab_addr,covv_subm_sample_id,covv_authors,covv_comment,comment_type" > $batched_meta
 
-    for f in `ls -1 "$fasta_notuploaded"`; do
+    for f in ${fasta_notuploaded}/*; do
         # set full file path
         # grab header line
         # remove header <, SC, consensus_, and .consensus_threshold_[0-9].[0-9]_quality_[0-9]
-        #if header has a / then rearraign, otherwise use header
-        full_path="$fasta_notuploaded"/$f
-        full_header=`cat "$full_path" | grep ">"`
-        sample_id=`echo $full_header | awk '{ gsub(">", "")  gsub("SC", "") gsub("Consensus_","") gsub(".SARS","")\
-		gsub("[.]consensus_threshold_[0-9].[0-9]_quality_[0-9].*","") gsub(" ","") gsub(".consensus.fa","") gsub(".fa",""); print $0}'`
-                
+        # if header has a / then rearraign, otherwise use header
+        sample_id=`cat $f | grep ">" | cut -f2 -d">" | cut -f2 -d"_" | cut -f1 -d"."`
+
 		# determine total number of seq
         # if the file is empty, set equal to 1
-        total_num=`cat "$full_path" | grep -v ">" | wc -m`
+        total_num=`cat "$f" | grep -v ">" | wc -m`
         if [ "$total_num" -eq 0 ]; then total_num=1; fi
 
         # determine total number of N
         # if there are no N's set value to 1
-        n_num=`cat "$full_path" | tr -d -c 'N' | awk '{ print length; }'`
+        n_num=`cat "$f" | tr -d -c 'N' | awk '{ print length; }'`
         if [ ! -n "$n_num" ]; then n_num=1; fi
 
         # if the frequency of N's is higher than 50 GISAID will reject
@@ -119,18 +105,17 @@ if [[ "$pipeline_prep" == "Y" ]]; then
         # failed folder and add to list
 		percent_n_calc=$(($n_num*100/$total_num))
         if [[ $percent_n_calc -gt 50 ]]; then
-			echo "--sample failed N check: $f at ${percent_n_calc}%_Ns"
-			short_f=`echo $f | sed "s/.consensus.fa//"`
-			echo "$short_f,qc_fail,qc_${percent_n_calc}%_Ns" >> $gisaid_results
-            mv "$full_path" "$fasta_failed"/"${sample_id}.fa"
+			echo "--sample failed N check: $sample_id at ${percent_n_calc}%_Ns"
+			echo "$sample_id,qc_fail,qc_${percent_n_calc}%_Ns" >> $gisaid_results
+            mv "$f" "$fasta_failed"/"${sample_id}.fa"
         else
 			#find associated metadata
-            meta=`cat "$log_dir/${config_metadata_file}" | grep "$sample_id"`
-                        
-			#if meta is found create input metadata row
+            meta=`cat "${config_metadata_file}" | grep "$sample_id"`
+            
+			# if meta is found create input metadata row
             if [[ ! "$meta" == "" ]]; then
-                #the filename that contains the sequence without path (e.g. all_sequences.fasta not c:\users\meier\docs\all_sequences.fasta)
-                IFS='/' read -r -a strarr <<< "$full_path"
+                # the filename that contains the sequence without path (e.g. all_sequences.fasta not c:\users\meier\docs\all_sequences.fasta)
+                IFS='/' read -r -a strarr <<< "$f"
 
                 #convert date to GISAID required format - 4/21/81 to 1981-04-21
                 raw_date=`echo $meta | awk -F',' '{print $3}'`
@@ -174,9 +159,7 @@ if [[ "$pipeline_prep" == "Y" ]]; then
                 aged=$(($today_dy-$patient_dy))
 
                 # if patient is <0 then add months
-                if [[ $agey -eq 0 ]]; then
-                    agey="$patient_mn months"
-                fi
+                if [[ $agey -eq 0 ]]; then agey="$patient_mn months"; fi
 
                 # if the patients birthday hasn't happened, adjust
                 if [[ $agem -lt 0 ]]; then
@@ -194,12 +177,12 @@ if [[ "$pipeline_prep" == "Y" ]]; then
             	# merge all fasta files that pass QC and metadata into one
                 # skips the header line and any odd formatted /date lines that follow
                 echo ">$virus_name" | sed 's/*/-/g' >> $batched_fasta
-                cat "$full_path" | grep -v ">" | grep -v "/" >> $batched_fasta
+                cat "$f" | grep -v ">" | grep -v "/" >> $batched_fasta
 
             else
-                # add sample to results, move associated files
+                add sample to results, move associated files
                 echo "$sample_id,qc_fail,qc_missing_metadata" >> $gisaid_results
-                mv "$full_path" "$fasta_failed"/${sample_id}.fa
+                mv "$f" "$fasta_failed"/${sample_id}.fa
             fi
         fi
     done
@@ -245,7 +228,7 @@ if [[ "$pipeline_qc" == "Y" ]]; then
 		echo "$sample_id,gisaid_fail,duplicated_id:$epi_id" >> $gisaid_results
 	done
 
-        ## for samples that had manifest error issues, add error
+    ## for samples that had manifest error issues, add error
 	## move samples to failed folder
 	for log_line in ${samples_manifest_errors[@]}; do
         sample_line=`cat $gisaid_log | grep "${log_line}"`
@@ -256,48 +239,15 @@ if [[ "$pipeline_qc" == "Y" ]]; then
 		echo "$sample_id,gisaid_fail,manifest_errors:$manifest_col" >> $gisaid_results
     done
 	
+	# save previous results
+	cp $final_results $pre_gisaid
+
 	# merge gisaid results to final results file by sample id
     sed -i "s/>Consensus_//g" $gisaid_results
 	sed -i "s/\.fa//g" $gisaid_results
-
 	sort $gisaid_results > tmp_gresults.txt
 	sort $final_results > tmp_fresults.txt
 	echo "sample_id,gisaid_status,gisaid_notes,sample_id,pango_status,pangolin_lineage,pangolin_scorpio,pangolin_version,nextclade_clade,aa_substitutions" > $final_results
 	join <(sort -k1 -t, tmp_gresults.txt) <(sort -k1 -t, tmp_fresults.txt) -t $',' >> $final_results
-	# rm tmp_fresults.txt tmp_gresults.txt
-
-	# # ensure fastas dont have multiple .fa's 
-	# for f in $project_dir/analysis/fastas/*/*; do
-	# 	new_name`echo $f | awk -F"[.]fa" '{ print $1".fa" }'`
-	# 	if [[ $f != $new_name ]]; then mv $f $new_name; fi
-	# done
-fi
-
-if [[ "$pipeline_rejected" == "Y" ]]; then
-    echo "------PROCESSING REJECTED SAMPLES"
-    # when a sample is rejected user creates analysis_workflow/reject_search.csv file
-	# information includes full sample name followed by "," and reason. these include frameshift, qc, other, truncation
-	# eg 
-
-	# code below will pull this line and update the final_results file with new information
-	rejected_lines=`cat $gisaid_rejected`
-
-    ## for samples that were rejected, update the final analysis file
-    ## move samples to failed folder
-    for rejected_line in ${rejected_lines[@]}; do
-		
-	# grab sampleID
-	sample_id=202`echo $rejected_line | cut -f3 -d'/' | cut -f3 -d"-" | sed "s/SC//g"`
-		
-	reject_reason=`echo $rejected_line | cut -f2 -d","`
-
-	results_line=`cat $final_results | grep "${sample_id}"`
-	new_line=`echo $results_line | sed "s/gisaid_pass/gisaid_rejected/g" | sed "s/EPI/$reject_reason-EPI/g"`
-
-	# move file to notuploaded dir
-	mv ${fasta_uploaded}/${sample_id}.* ${fasta_failed}
-		
-	# replace the old line with the new line
-	sed -i "s/$results_line/$new_line/" $final_results
-    done
+	rm tmp_fresults.txt tmp_gresults.txt
 fi

@@ -78,7 +78,7 @@ originating_lab: "Pathology and Laboratory Medicine Institute, Cleveland Clinic,
 address_originating: "9500 Euclid Avenue, Cleveland, Ohio 44195, USA"
 submitting_lab: "Ohio Department of Health Laboratory"
 address_submitting: "8995 East Main Street, Reynoldsburg, Ohio 43068"
-authors: "Samantha Sevilla, Eric Brandt, Keoni Omura, Jade Mowery, Michael Weinstein, Clara Zumpetta-Miller, Erica Leasure, Brent Lee, Quanta Brown"
+authors: "Samantha Sevilla, Eric Brandt, Keoni Omura, Jade Mowery, Michael Weinstein, Clara Zumpetta-Miller, Erica Leasure, Brent Lee"
 
 ############# NCBI (attributes)
 bioproject_accession: "PRJNA701669"
