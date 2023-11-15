@@ -37,7 +37,7 @@ plot1 = plot.map(sns.barplot,
 
 #rotate x axis labels, shrink font
 for axes in plot.axes.flat:
-    _ = axes.set_xticklabels(axes.get_xticklabels(), rotation=90, Fontsize=5)
+    _ = axes.set_xticklabels(axes.get_xticklabels(), rotation=90)
 
 #add labels to plot
 for ax in plot.axes:

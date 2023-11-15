@@ -64,3 +64,6 @@ Usage:  -p [OPTIONAL] partial_run
         -p Y,N option to run partial run settings (default N)
 Usage:  -r [OPTIONAL] reject_flag
         -r Y,N option to run GISAID or NCBI processed samples (default N)
+
+### Authors
+This pipeline was created by Samantha Sevilla Chill, for support of work at the Ohio Department of Health Public Laboratory.
