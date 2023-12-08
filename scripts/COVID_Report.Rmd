@@ -1,0 +1,122 @@
+---
+title: "SARS_Report"
+author: "Samatha Chill"
+date: "REP_TODAY"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+project_id="REP_ID"
+project_date="REP_DATE"
+```
+
+```{r, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(DT)
+```
+
+```{r, include=FALSE}
+#set dir
+project_dir=paste0("//LABAUTHDC2/Shared/Micro/WGS/Coronavirus_WGS/COVID-19 Fastas/",project_id)
+project_file=paste0(project_dir,"/analysis/reports/final_results_",project_date,".csv")
+qc_file=paste0(project_dir,"/analysis/intermed/cecret_results.txt")
+  
+#read in file
+final_csv=read.csv(project_file,sep=",")
+final_csv=final_csv %>% filter(!grepl('Control', sample_id))
+head(final_csv)
+
+#subset
+pass_df=subset(final_csv,pango_status=="pass")
+fail_df=subset(final_csv,pango_status!="pass")
+
+# create major lineage type
+pass_df$major=vapply(strsplit(pass_df$pangolin_lineage,"[.]"), 
+                     `[`, 1, FUN.VALUE=character(1))
+
+#read in QC
+qc_csv=read.csv(qc_file,sep="\t")
+qc_csv$depth=vapply(strsplit(as.character(qc_csv$X1X_coverage_after_trimming),"[.]"), 
+                     `[`, 1, FUN.VALUE=character(1))
+
+# create pass/fail qc
+pass_qc=subset(qc_csv,sample_id %in% pass_df$sample_id)
+fail_qc=subset(qc_csv,sample_id %in% fail_df$sample_id)
+```
+
+## Summary {.tabset}
+
+### Pipeline Information
+- Cecret config: /home/ubuntu/output/REP_ID/logs/config_cecret.config
+- Sequence run date: REP_DATE
+- Pangolin version: 4.3.1-pdata-1.23.1
+- Nextclade version: 3.0.0-alpha.0
+- Cecret version: 3.10.20231205
+
+### All Samples
+```{r echo=FALSE}
+print(paste0("The total number of samples in project: ",nrow(final_csv)))
+print(paste0("The total number of samples passing project: ",nrow(pass_df)))
+print(paste0("The total number of samples failing project: ",nrow(fail_df)))
+```
+
+### Passing Samples
+
+Depth of coverage for all passing samples
+```{r echo=FALSE}
+ggplot(pass_qc, aes(x = depth)) +
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+```{r echo=FALSE}
+DT::datatable(pass_df)
+```
+
+### Failing Samples
+
+```{r echo=FALSE}
+ggplot(fail_qc, aes(x = depth)) +
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+```{r echo=FALSE}
+DT::datatable(fail_df[,1:2])
+```
+
+## Lineage {.tabset}
+
+### All lineages
+
+```{r echo=FALSE}
+ggplot(pass_df, aes(x = major,fill=major)) +
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+ggplot(pass_df, aes(x = pangolin_lineage,fill=major)) +
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+### Highlighted Lineage
+
+```{r echo=FALSE}
+lineage_list=c("BA.2.86")
+for (lin in lineage_list){
+  lineage_df=subset(pass_df,pangolin_lineage==lin)
+
+  if(nrow(lineage_df)>0){
+  print(paste0("Sample(s) with the selected lineage (",lin, ") are present in the dataset (N=",nrow(lineage_df),")."))
+  } else{
+    print(paste0("There are no samples in this dataset with this lineage: ",lin))
+  }
+}
+```
+
+```{r echo=FALSE}
+DT::datatable(lineage_df)
+```

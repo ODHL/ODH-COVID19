@@ -19,42 +19,33 @@ testing=${10}
 ## N = run full run
 ## T = run 2 batches, 4 samples
 ## U = run user generated manifest
+flag_download="N"
+flag_batch="N"
+flag_analysis="N"
+flag_cleanup="N"
+flag_report="N"
 if [[ $subworkflow == "DOWNLOAD" ]]; then
 	flag_download="Y"
-	flag_batch="N"
-	flag_cecret="N"
-	flag_cleanup="N"
-	flag_report="N"
 elif [[ $subworkflow == "BATCH" ]]; then
-    flag_download="N"
     flag_batch="Y"
-    flag_cecret="N"
-    flag_cleanup="N"
-    flag_report="N"
 elif [[ $subworkflow == "ANALYZE" ]]; then
-    flag_download="N"
-    flag_batch="N"
-    flag_cecret="Y"
-    flag_report="N"
-    flag_cleanup="N"
+    flag_analysis="Y"
 elif [[ $subworkflow == "REPORT" ]]; then
-    flag_download="N"
-    flag_batch="N"
-    flag_cecret="N"
     flag_report="Y"
-    flag_cleanup="N"
 elif [[ $subworkflow == "CLEAN" ]]; then
-    flag_download="N"
-    flag_batch="N"
-    flag_cecret="N"
-    flag_report="N"
     flag_cleanup="Y"
 elif [[ $subworkflow == "ALL" ]]; then
 	flag_download="Y"
     flag_batch="Y"
-    flag_cecret="Y"
+    flag_analysis="Y"
     flag_report="Y"
     flag_cleanup="Y"
+elif [[ $subworkflow == "lala" ]]; then
+	flag_download="N"
+    flag_batch="N"
+    flag_analysis="N"
+    flag_report="N"
+    flag_cleanup="N"
 else
 	echo "CHOOSE CORRECT FLAG -s: DOWNLOAD BATCH ANALYZE REPORT CLEAN ALL"
 	echo "YOU CHOOSE: $subworkflow"
@@ -72,12 +63,13 @@ cecret_cmd=$config_cecret_cmd
 
 # set script
 fragment_plots_script=$config_frag_plot_script
+
 #########################################################
 # Set dirs, files, args
 #########################################################
 # set dir
 log_dir=$output_dir/logs
-cecret_dir=$output_dir/cecret
+pipeline_dir=$output_dir/pipeline
 rawdata_dir=$output_dir/rawdata
 
 analysis_dir=$output_dir/analysis
@@ -124,7 +116,7 @@ cecret_version=`cat config/software_versions.txt | awk '$1 ~ /cecret/' | awk -v 
 primer_version=`cat config/software_versions.txt | awk '$1 ~ /primer/' | awk -v pid="$primer_id" '$2 ~ pid' | awk '{ print $3 }'`
 insert_version=`cat config/software_versions.txt | awk '$1 ~ /insert/' | awk -v pid="$insert_id" '$2 ~ pid' | awk '{ print $3 }'`
 if [[ "$pangolin_version" == "" ]] | [[ "$nextclade_version" == "" ]]; then
-    echo "Choose the correct version of PANGOLIN/NEXTCLADE in /project/logs/config_pipeline.yaml"
+    echo "Choose the correct version of PANGOLIN/NEXTCLADE in /logs/config/config_pipeline.yaml"
     echo "PANGOLIN: $pangolin_version"
     echo "NEXTCLADE: $nextclade_version"
     exit
@@ -147,7 +139,7 @@ sed -i "s/$old_cmd/$new_cmd/" $cecret_config
 # check file existence
 # escape / with \/ for sed replacement
 # replace the cecret config file with the reference selected
-reference_list=("reference_genome" "gff_file")
+reference_list=("reference_genome" "gff")
 for ref_file in ${reference_list[@]}; do
     ref_line=$(cat "${pipeline_config}" | grep $ref_file)
     ref_path=`echo $config_reference_dir/${ref_line/"$ref_file": /} | tr -d '"'`
@@ -196,7 +188,7 @@ cat "$cecret_config" | grep "params.primer_bed" >> $pipeline_log
 cat "$cecret_config" | grep "params.amplicon_bed" >> $pipeline_log
 
 message_cmd_log "------------------------------------------------------------------------"
-message_cmd_log "--- STARTING CECRET ANALYSIS ---"
+message_cmd_log "--- STARTING ANALYSIS ---"
 
 echo "Starting time: `date`" >> $pipeline_log
 echo "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
@@ -249,7 +241,7 @@ if [[ $flag_batch == "Y" ]]; then
 	# create manifests
 	cd $tmp_dir
 	for f in *ds*/*; do
-		new=`echo $f | sed "s/[_-]SARS//g" | cut -f1 -d"_"`
+		new=`echo $f  | sed "s/_[0-9].*//g"`
 		echo "$new" | cut -f2 -d"/" >> $sample_id_file
 	done
 
@@ -271,17 +263,24 @@ if [[ $flag_batch == "Y" ]]; then
 			#remove previous versions of batch log
 			batch_manifest=$log_dir/manifests/batch_${batch_name}.txt
             if [[ -f $batch_manifest ]]; then rm $batch_manifest; fi
-        
-        	#create batch manifest
-        	touch $log_dir/manifests/batch_${batch_name}.txt
+
+	        # remove previous versions of samplesheet
+			samplesheet=$log_dir/manifests/samplesheet_${batch_name}.csv	
+			if [[ -f $samplesheet ]]; then rm $samplesheet; fi
+        		
+			# create samplesheet
+			echo "sample,fastq_1,fastq_2" > $log_dir/manifests/samplesheet_${batch_name}.csv
+			
+			# create batch dirs
+			fastq_batch_dir=$rawdata_dir/batch_$batch_count
         fi
-            	
-	    # set batch manifest
-        batch_manifest=$log_dir/manifests/batch_${batch_name}.txt
             
 		#echo sample id to the batch
-	   	echo ${sample_id} >> $batch_manifest
-                
+	   	echo ${sample_id} >> $batch_manifest                
+		
+		# prepare samplesheet
+        echo "${sample_id},$fastq_batch_dir/$sample_id.R1.fastq.gz,$fastq_batch_dir/$sample_id.R2.fastq.gz">>$samplesheet
+
     	#increase sample counter
     	((sample_count+=1))
             
@@ -302,21 +301,30 @@ if [[ $flag_batch == "Y" ]]; then
 
 		# grab the first two samples and last two samples, save as new batches
 		head -2 $batch_manifest > $log_dir/manifests/batch_01.txt
-		#tail -2 $batch_manifest > $log_dir/manifests/batch_02.txt
+		tail -2 $batch_manifest > $log_dir/manifests/batch_02.txt
 
+		# fix samplesheet
+		mv $log_dir/manifests/samplesheet* $log_dir/manifests/save
+		samplesheet=$log_dir/manifests/save/samplesheet_01.csv
+		head -3 $samplesheet > $log_dir/manifests/samplesheet_01.csv
+		head -1 $samplesheet > $log_dir/manifests/samplesheet_02.csv
+		tail -2 $samplesheet >> $log_dir/manifests/samplesheet_02.csv
+		sed -i "s/batch_1/batch_2/g" $log_dir/manifests/samplesheet_02.csv
+		
 		# set new batch count
-		batch_count=1
+		batch_count=2
 		sample_final=4
 	fi
 
 	#log
-	message_cmd_log "--A total of $sample_final samples will be processed in $batch_count batches, with a maximum of $config_batch_limit samples per batch"
+	message_cmd_log "----A total of $sample_final samples will be processed in $batch_count batches, with a maximum of $config_batch_limit samples per batch"
 fi
+
 
 #############################################################################################
 # Analysis
 #############################################################################################
-if [[ $flag_cecret == "Y" ]]; then
+if [[ $flag_analysis == "Y" ]]; then
 	#log
 	message_cmd_log "--Processing batches:"
 
@@ -333,76 +341,91 @@ if [[ $flag_cecret == "Y" ]]; then
 		# set batch manifest, dirs
 		batch_manifest=$log_dir/manifests/batch_${batch_name}.txt
 		fastq_batch_dir=$rawdata_dir/batch_$batch_id
-		cecret_batch_dir=$cecret_dir/batch_$batch_id
+		pipeline_batch_dir=$pipeline_dir/batch_$batch_id
+		samplesheet=$log_dir/manifests/samplesheet_0$batch_id.csv
 		if [[ ! -d $fastq_batch_dir ]]; then mkdir $fastq_batch_dir; fi
-		if [[ ! -d $cecret_batch_dir ]]; then mkdir $cecret_batch_dir; fi
+		if [[ ! -d $pipeline_batch_dir ]]; then mkdir $pipeline_batch_dir; fi
 
-		# read text file
-		IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest
-
-		# print number of lines in file without file name "<"
-		n_samples=`wc -l < $batch_manifest`
-		echo "----Batch_$batch_id ($n_samples samples)"
-		echo "----Batch_$batch_id ($n_samples samples)" >> $pipeline_log
-
-		# run per sample, download files
-		for sample_id in ${sample_list[@]}; do
-
-			# download from basespace
-			$config_basespace_cmd download biosample --quiet -n "${sample_id}" -o $rawdata_dir
-
-	    	# move files to batch fasta dir
-    		mv $rawdata_dir/*${sample_id}*/*fastq.gz $fastq_batch_dir
-    
-    		# If generating a QC report, BASESPACE files need to be unzipped
-        	# and selected files moved for downstream analysis
-    		if [[ ! -d "$tmp_dir/${sample_id}" ]]; then mkdir $tmp_dir/${sample_id}; fi
-			
-			# unzip analysis file downloaded from DRAGEN to sample tmp dir - used in QC
-			unzip -o -q $tmp_dir/${sample_id}*/*.zip -d $tmp_dir/${sample_id}
-
-	    	# move needed files to general tmp dir
-			mv $tmp_dir/${sample_id}/ma/* $tmp_dir/unzipped
-    	
-            # remove sample tmp dir, downloaded proj dir
-        	rm -r --force $tmp_dir/${sample_id}
-    
-    		# remove downloaded tmp dir
-	        rm -r --force $tmp_dir/${sample_id}_[0-9]*/
-		done
-
-		# rename all ID files
-		## batch manifests
-		sed -i "s/[_-]SARS//g" $batch_manifest; sed -i "s/-$project_name_full//g" $batch_manifest
-		sed -i "s/-$project_name//g" $batch_manifest
-		
-		## fastq files renamed
-		for f in $fastq_batch_dir/*; do
-			new=`echo $f | sed "s/[_-]SARS//g" | sed "s/-$project_name_full//g" | sed "s/-$project_name//g"`
-			mv $f $new
-		done
-
-		## qc files renamed
-		for f in $tmp_dir/unzipped/*; do
-			new=`echo $f | sed "s/[_-]SARS//g" | sed "s/-$project_name_full//g" | sed "s/-$project_name//g"`
-			if [[ $new != $f ]]; then mv $f $new; fi
-		done
-
-		#log
-		message_cmd_log "------CECRET"
-		echo "-------Starting time: `date`" >> $pipeline_log
-    	echo "-------Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
-	
 		#create proj tmp dir to enable multiple projects to be run simultaneously
 		project_number=`$config_basespace_cmd list projects --filter-term="${project_name_full}" | sed -n '4 p' | awk '{split($0,a,"|"); print a[3]}' | sed 's/ //g'`
 		if [[ ! -d $project_number ]]; then mkdir $project_number; fi
-		cd $project_number
 		
-		# deploy cecret
-		cecret_cmd_line="$cecret_cmd --reads $fastq_batch_dir --reads_type paired -c $cecret_config --outdir $cecret_batch_dir"
-		echo $cecret_cmd_line
-		$cecret_cmd_line
+		if [[ $resume == "Y" ]]; then
+			cd $project_number
+			
+			# deploy cecret
+			cecret_cmd_line="$cecret_cmd -resume --sample_sheet $samplesheet --reads_type paired --outdir $pipeline_batch_dir"
+			echo $cecret_cmd_line
+			$cecret_cmd_line
+		else
+			# read text file
+			IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest
 
+			# print number of lines in file without file name "<"
+			n_samples=`wc -l < $batch_manifest`
+			echo "----Batch_$batch_id ($n_samples samples)"
+			echo "----Batch_$batch_id ($n_samples samples)" >> $pipeline_log
+
+			# run per sample, download files
+			for sample_id in ${sample_list[@]}; do
+
+				# download from basespace
+				$config_basespace_cmd download biosample --quiet -n "${sample_id}" -o $rawdata_dir
+
+				# move files to batch fasta dir
+				mv $rawdata_dir/*${sample_id}*/*fastq.gz $fastq_batch_dir
+		
+				# If generating a QC report, BASESPACE files need to be unzipped
+				# and selected files moved for downstream analysis
+				if [[ ! -d "$tmp_dir/${sample_id}" ]]; then mkdir $tmp_dir/${sample_id}; fi
+				
+				# unzip analysis file downloaded from DRAGEN to sample tmp dir - used in QC
+				unzip -o -q $tmp_dir/${sample_id}*/*.zip -d $tmp_dir/${sample_id}
+
+				# move needed files to general tmp dir
+				mv $tmp_dir/${sample_id}/ma/* $tmp_dir/unzipped
+			
+				# remove sample tmp dir, downloaded proj dir
+				rm -r --force $tmp_dir/${sample_id}
+		
+				# remove downloaded tmp dir
+				rm -r --force $tmp_dir/${sample_id}_[0-9]*/
+			done
+			
+			# remove the "_S39_L001" and "_001" from the file name
+			for f in $fastq_batch_dir/*; do
+				new=`echo $f | sed "s/_S[0-9].*_L001//g" | sed "s/_001//g" | sed "s/[_-]SARS//g" | sed "s/-$project_name_full//g" | sed "s/-$project_name//g" | sed "s/_R/.R/g"`
+				if [[ $new != $f ]]; then mv $f $new; fi
+			done
+
+			# rename all ID files
+			## batch manifests
+			sed -i "s/[_-]SARS//g" $batch_manifest; sed -i "s/-$project_name_full//g" $batch_manifest
+			sed -i "s/-$project_name//g" $batch_manifest
+			sed -i "s/[_-]SARS//g" $samplesheet; sed -i "s/-$project_name_full//g" $samplesheet
+			sed -i "s/-$project_name//g" $samplesheet
+			
+			## qc files renamed
+			for f in $tmp_dir/unzipped/*; do
+				new=`echo $f | sed "s/[_-]SARS//g" | sed "s/-$project_name_full//g" | sed "s/-$project_name//g"`
+				if [[ $new != $f ]]; then mv $f $new; fi
+			done
+
+			#log
+			message_cmd_log "------CECRET"
+			echo "-------Starting time: `date`" >> $pipeline_log
+			echo "-------Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
+		
+			# copy config
+			cp $cecret_config $pipeline_batch_dir
+
+			# deploy cecret
+			cd $project_number
+			cecret_cmd_line="$cecret_cmd --sample_sheet $samplesheet --reads_type paired --outdir $pipeline_batch_dir"
+			echo $cecret_cmd_line
+			$cecret_cmd_line
+		fi
+		
 		# log
     	echo "-------Ending time: `date`" >> $pipeline_log
 		echo "-------Ending space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
@@ -411,43 +434,43 @@ if [[ $flag_cecret == "Y" ]]; then
 		# Reporting
 		#############################################################################################	
 		# add to  master cecret results
-		cat $cecret_batch_dir/cecret_results.txt >> $merged_cecret
+		cat $pipeline_batch_dir/cecret_results.txt >> $merged_cecret
 
 		# add to master nextclade results
-		cat $cecret_batch_dir/nextclade/nextclade.csv >> $merged_nextclade
+		cat $pipeline_batch_dir/nextclade/nextclade.csv >> $merged_nextclade
 
 	    # add to master pangolin results
-		cat $cecret_batch_dir/pangolin/lineage_report.csv >> $merged_pangolin
+		cat $pipeline_batch_dir/pangolin/lineage_report.csv >> $merged_pangolin
 
 		#add to master cecret summary
-		cat $cecret_batch_dir/combined_summary.csv >> $merged_summary
+		cat $pipeline_batch_dir/combined_summary.csv >> $merged_summary
 
 		# If QC report is being created, generate stats on fragment length
-        for f in $cecret_batch_dir/samtools_stats/*.stats.txt; do
+        for f in $pipeline_batch_dir/samtools_stats/*.stats.txt; do
     		frag_length=`cat $f | grep "average length" | awk '{print $4}'`
         	sampleid=`echo $f | rev | cut -f1 -d "/" | rev | cut -f1 -d "."`
 	        echo -e "${sampleid}\t${frag_length}\t${batch_id}" >> $merged_fragment
     	done
 
 		# move FASTQC files
-		mv $cecret_batch_dir/fastqc/* $fastqc_dir
+		mv $pipeline_batch_dir/fastqc/* $fastqc_dir
 		
 		# move FASTA files
-		mv $cecret_batch_dir/consensus/*fa $fasta_dir/not_uploaded
+		mv $pipeline_batch_dir/consensus/*fa $fasta_dir/not_uploaded
 		for f in $fasta_dir/not_uploaded/*; do
 			new=`echo $f | sed "s/.consensus//g"`
 			mv $f $new
 		done
 
 		#remove intermediate files
-		if [[ $flag_cleanup == "Y" ]]; then
-			sudo rm -r --force work
-			sudo rm -r --force */work
-			sudo rm -r --force $cecret_batch_dir
-			sudo rm -r --force $fastq_batch_dir
-			cd ..
-			sudo rm -r $project_id
-		fi
+		# if [[ $flag_cleanup == "Y" ]]; then
+		# 	sudo rm -r --force work
+		# 	sudo rm -r --force */work
+		# 	sudo rm -r --force $pipeline_batch_dir
+		# 	sudo rm -r --force $fastq_batch_dir
+		# 	cd ..
+		# 	sudo rm -r $project_id
+		# fi
 	done
 fi
 
@@ -495,7 +518,7 @@ if [[ $flag_cleanup == "Y" ]]; then
 	#remove all proj files
 	sudo rm -r --force $project_number
 	sudo rm -r --force $tmp_dir
-	sudo rm -r --force $cecret_dir
+	sudo rm -r --force $pipeline_dir
 	sudo rm -r --force $rawdata_dir
 	sudo rm -r --force $fastqc_dir
 fi

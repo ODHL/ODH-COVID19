@@ -24,11 +24,11 @@ helpFunction()
    echo -e "\t-p options: init, sarscov2, gisaid, ncbi, stat, update"
    echo "Usage: $2 -n [REQUIRED] project_id"
    echo -e "\t-n project id"
-   echo "Usage: $3 -s [OPTIONAL] subworkflow options"
-   echo -e "\t-s DOWNLOAD, BATCH, CECRET, ALL"   
+   echo "Usage: $3 -s [REQUIRED] subworkflow options"
+   echo -e "\t-s DOWNLOAD, BATCH, ANALYZE REPORT CLEAN ALL | PREP UPLOAD QC"
    echo "Usage: $4 -r [OPTIONAL] resume options"
    echo -e "\t-r Y,N option to resume -p GISAID workflow in progress"
-   echo "Usage: $5 -r [OPTIONAL] testing options"
+   echo "Usage: $5 -t [OPTIONAL] testing options"
    echo -e "\t-r Y,N option to run test"
    exit 1 # Exit script after printing help
 }
@@ -77,11 +77,6 @@ source $(dirname "$0")/scripts/functions.sh
 project_name_full=$(echo $project_id | sed 's:/*$::')
 project_name=$(echo $project_id | cut -f1 -d "_" | cut -f1 -d " ")
 
-#set defaults for optional args
-if [ -z "$testing_flag" ]; then testing_flag="N"; fi
-if [ -z "$partial_flag" ]; then partial_flag="N"; fi
-if [ -z "$reject_flag" ]; then reject_flag="N"; fi
-
 # set date
 date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
 
@@ -94,14 +89,14 @@ log_dir=$output_dir/logs
 analysis_dir=$output_dir/analysis
 rawdata_dir=$output_dir/rawdata
 tmp_dir=$output_dir/tmp
-cecret_dir=$output_dir/cecret
+pipeline_dir=$output_dir/pipeline
 
 # set files
 final_results=$analysis_dir/reports/final_results_$date_stamp.csv
 pipeline_log=$log_dir/pipeline_log.txt
-multiqc_config="$log_dir/configs/config_multiqc.yaml"
-pipeline_config="$log_dir/configs/config_pipeline.yaml"
-cecret_config="$log_dir/configs/config_cecret.config"
+multiqc_config="$log_dir/config/config_multiqc.yaml"
+pipeline_config="$log_dir/config/config_pipeline.yaml"
+cecret_config="$log_dir/config/config_cecret.config"
 
 # ncbi dir to hold until completion of sampling
 ncbi_hold="../ncbi_hold/$project_id"
@@ -119,7 +114,7 @@ if [[ "$pipeline" == "init" ]]; then
     if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
 
     ## parent
-	dir_list=(logs rawdata cecret tmp analysis)
+	dir_list=(logs rawdata pipeline tmp analysis)
     for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/$pd ]]; then mkdir -p $output_dir/$pd; fi; done
 
     ## tmp
@@ -127,7 +122,7 @@ if [[ "$pipeline" == "init" ]]; then
     for pd in "${dir_list[@]}"; do if [[ ! -d $tmp_dir/$pd ]]; then mkdir -p $tmp_dir/$pd; fi; done
 
 	## logs
-	dir_list=(configs manifests cecret gisaid ncbi)
+	dir_list=(config manifests pipeline gisaid ncbi)
     for pd in "${dir_list[@]}"; do if [[ ! -d $log_dir/$pd ]]; then mkdir -p $log_dir/$pd; fi; done
 
     ## analysis
@@ -145,16 +140,16 @@ if [[ "$pipeline" == "init" ]]; then
 	files_save=("config/config_pipeline.yaml" "config/config_cecret.config" "config/config_multiqc.yaml")
   	for f in ${files_save[@]}; do
         IFS='/' read -r -a strarr <<< "$f"
-    	if [[ ! -f "${log_dir}/configs/${strarr[1]}" ]]; then
-            cp $f "${log_dir}/configs/${strarr[1]}"
+    	if [[ ! -f "${log_dir}/config/${strarr[1]}" ]]; then
+            cp $f "${log_dir}/config/${strarr[1]}"
 		fi
 	done
 
 	#update metadata name
-	sed -i "s~metadata.csv~${log_dir}/manifests/metadata-${project_name}.csv~" "${log_dir}/configs/config_pipeline.yaml" 
+	sed -i "s~metadata.csv~${log_dir}/manifests/metadata-${project_name}.csv~" "${log_dir}/config/config_pipeline.yaml" 
 
   	#output
-	echo -e "Configs are ready to be edited:\n${log_dir}/configs"
+	echo -e "Configs are ready to be edited:\n${log_dir}/config"
 	echo "*** INITIALIZATION COMPLETE ***"
 	echo
 
@@ -163,6 +158,21 @@ elif [[ "$pipeline" == "update" ]]; then
     #update the staphb toolkit
     staphb-tk --auto_update
 
+elif [[ "$pipeline" == "validation" ]]; then
+	# remove prev runs
+	sudo rm -rf ~/output/OH-VH00648-231124
+
+	# init
+	bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p init
+
+	# run through workflow
+    bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s DOWNLOAD
+    bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s BATCH -t Y
+	# cp -r ~/output/OH-VH00648-231124/savelogs ~/output/OH-VH00648-231124/logs
+	# cp  -r ~/output/OH-VH00648-231124/savetmp ~/output/OH-VH00648-231124/tmp
+    bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s ANALYZE -t Y -r N
+    # bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s REPORT -t Y
+    # bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s lala -t Y
 elif [[ "$pipeline" == "sarscov2" ]]; then
 	
 	#############################################################################################
@@ -175,7 +185,7 @@ elif [[ "$pipeline" == "sarscov2" ]]; then
 	check_initialization
 
     # run SARS-COV2 pipeline
-	bash scripts/cecret.sh \
+	bash scripts/analysis.sh \
 		"${output_dir}" \
 		"${project_name_full}" \
 		"${pipeline_config}" \
@@ -188,9 +198,9 @@ elif [[ "$pipeline" == "sarscov2" ]]; then
 		"${testing}"
 
 	# run QC
-	bash scripts/seq_qc.sh \
-		"${output_dir}" \
-		"${pipeline_config}"
+	# bash scripts/seq_qc.sh \
+	# 	"${output_dir}" \
+	# 	"${pipeline_config}"
 
 elif [[ "$pipeline" == "gisaid" ]]; then
 	#########################################################
@@ -218,7 +228,7 @@ elif [[ "$pipeline" == "gisaid" ]]; then
     	fi
 	else
 		echo "----Missing fasta files"
-		exit
+		#exit
 	fi
 		
 	# log

@@ -4,5 +4,6 @@ bin/
 # ignore upload dir
 gisaid_upload/
 
+.nextflow*
 # ignore mkdocs site
 site/*

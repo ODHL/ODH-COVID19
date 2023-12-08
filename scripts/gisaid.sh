@@ -67,6 +67,7 @@ else
 	EXIT
 fi
 
+echo "IN GISAID"
 #########################################################
 # Code
 #########################################################
@@ -253,4 +254,26 @@ if [[ "$pipeline_qc" == "Y" ]]; then
 	echo "sample_id,gisaid_status,gisaid_notes,sample_id,pango_status,pangolin_lineage,pangolin_scorpio,pangolin_version,nextclade_clade,aa_substitutions" > $final_results
 	join <(sort -k1 -t, tmp_gresults.txt) <(sort -k1 -t, tmp_fresults.txt) -t $',' >> $final_results
 	rm tmp_fresults.txt tmp_gresults.txt
+
+	# create QC / analysis reports
+	nofails="scripts/COVID_Report_nofails.Rmd"
+	fails="scripts/COVID_Report.Rmd"
+
+	cp $nofails $output_dir/analysis/reports
+	cp $fails $output_dir/analysis/reports
+		
+	nofails="$output_dir/analysis/reports/COVID_Report_nofails.Rmd"
+	fails="$output_dir/analysis/reports/COVID_Report.Rmd"
+
+	form_date=`date '+%Y-%m-%d'`
+	proj_date=`echo $project_id | cut -f3 -d"-"`
+
+	sed -i "s/REP_TODAY/$form_date/g" $nofails
+	sed -i "s/REP_ID/$project_id/g" $nofails
+	sed -i "s/REP_DATE/20$proj_date/g" $nofails
+
+	sed -i "s/REP_TODAY/$form_date/g" $fails
+	sed -i "s/REP_ID/$project_id/g" $fails
+	sed -i "s/REP_DATE/20$proj_date/g" $fails
+
 fi
