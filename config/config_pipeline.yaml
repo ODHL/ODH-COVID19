@@ -45,7 +45,7 @@ nextclade_version: "10"
 cecret_version: "4"
 
 # cmds
-cecret_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/tools/cecret_2/Cecret -profile docker"
+cecret_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/SARS_CoV_2_Workflow/tools/Cecret -profile docker"
 basespace_cmd: "/home/ubuntu/tools/basespace"
 gisaid_cmd: "/home/ubuntu/.local/bin/cli3"
 

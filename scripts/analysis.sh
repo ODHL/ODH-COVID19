@@ -235,15 +235,14 @@ if [[ $flag_batch == "Y" ]]; then
 	echo "--Creating batch files"
 
 	# create sampleID file
-	if [[ -f $sample_id_file ]]; then rm $sample_id_file; fi
-	touch $sample_id_file
-
-	# create manifests
 	cd $tmp_dir
+	if [[ -f tmp.txt ]]; then rm tmp.txt; fi
+	touch tmp.txt
 	for f in *ds*/*; do
 		new=`echo $f  | sed "s/_[0-9].*//g"`
-		echo "$new" | cut -f2 -d"/" >> $sample_id_file
+		echo "$new" | cut -f2 -d"/" >> tmp.txt
 	done
+	cat tmp.txt | uniq > $sample_id_file
 
     #read in text file with all project id's
 	IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file

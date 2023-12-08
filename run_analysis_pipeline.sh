@@ -171,7 +171,7 @@ elif [[ "$pipeline" == "validation" ]]; then
 	# cp -r ~/output/OH-VH00648-231124/savelogs ~/output/OH-VH00648-231124/logs
 	# cp  -r ~/output/OH-VH00648-231124/savetmp ~/output/OH-VH00648-231124/tmp
     bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s ANALYZE -t Y -r N
-    # bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s REPORT -t Y
+    bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s REPORT -t Y
     # bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s lala -t Y
 elif [[ "$pipeline" == "sarscov2" ]]; then
 	
