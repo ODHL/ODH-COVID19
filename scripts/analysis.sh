@@ -310,7 +310,7 @@ if [[ $flag_batch == "Y" ]]; then
 		head -1 $samplesheet > $log_dir/manifests/samplesheet_02.csv
 		tail -2 $samplesheet >> $log_dir/manifests/samplesheet_02.csv
 		sed -i "s/batch_1/batch_2/g" $log_dir/manifests/samplesheet_02.csv
-		
+
 		# set new batch count
 		batch_count=2
 		sample_final=4
@@ -352,7 +352,8 @@ if [[ $flag_analysis == "Y" ]]; then
 		
 		if [[ $resume == "Y" ]]; then
 			cd $project_number
-			
+			message_cmd_log "----Resuming pipeline"
+
 			# deploy cecret
 			cecret_cmd_line="$cecret_cmd -resume --sample_sheet $samplesheet --reads_type paired --outdir $pipeline_batch_dir"
 			echo $cecret_cmd_line
@@ -463,14 +464,14 @@ if [[ $flag_analysis == "Y" ]]; then
 		done
 
 		#remove intermediate files
-		# if [[ $flag_cleanup == "Y" ]]; then
-		# 	sudo rm -r --force work
-		# 	sudo rm -r --force */work
-		# 	sudo rm -r --force $pipeline_batch_dir
-		# 	sudo rm -r --force $fastq_batch_dir
-		# 	cd ..
-		# 	sudo rm -r $project_id
-		# fi
+		if [[ $flag_cleanup == "Y" ]]; then
+			sudo rm -r --force work
+			sudo rm -r --force */work
+			sudo rm -r --force $pipeline_batch_dir
+			sudo rm -r --force $fastq_batch_dir
+			cd ..
+			sudo rm -r $project_id
+		fi
 	done
 fi
 
