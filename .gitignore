@@ -5,3 +5,5 @@ bin/
 gisaid_upload/
 
 .nextflow*
+# ignore mkdocs site
+site/*

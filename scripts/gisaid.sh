@@ -62,10 +62,9 @@ elif [[ $subworkflow == "ALL" ]]; then
 	pipeline_upload="Y"
 	pipeline_qc="Y"
 else
-	echo "skipped $subworkflow"
-	pipeline_prep="N"
-	pipeline_upload="N"
-	pipeline_qc="N"
+	echo "CHOOSE CORRECT FLAG -s: PREP UPLOAD QC ALL"
+	echo "YOU CHOOSE: $subworkflow"
+	EXIT
 fi
 
 echo "IN GISAID"

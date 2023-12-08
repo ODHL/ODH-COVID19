@@ -101,5 +101,6 @@ nav:
     - 4. NCBI: ODH-COVID19/ncbi.md
     - 5. Maintenance: ODH-COVID19/maintenance.md
   - FAQ:
+    - Dependencies: ODH-COVID19/dependencies.md
     - Troubleshooting: ODH-COVID19/troubleshooting.md
     - Citation: ODH-COVID19/citation.md
