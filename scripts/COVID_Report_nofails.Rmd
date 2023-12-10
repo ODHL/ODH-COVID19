@@ -39,7 +39,7 @@ pass_df$major=vapply(strsplit(pass_df$pangolin_lineage,"[.]"),
 
 #read in QC
 qc_csv=read.csv(qc_file,sep="\t")
-qc_csv$depth=vapply(strsplit(as.character(qc_csv$X1X_coverage_after_trimming),"[.]"), 
+qc_csv$depth=vapply(strsplit(as.character(qc_csv$samtools_per_1X_coverage_after_trimming),"[.]"), 
                      `[`, 1, FUN.VALUE=character(1))
 
 # create pass/fail qc

@@ -148,6 +148,9 @@ if [[ "$pipeline" == "init" ]]; then
 	#update metadata name
 	sed -i "s~metadata.csv~${log_dir}/manifests/metadata-${project_name}.csv~" "${log_dir}/config/config_pipeline.yaml" 
 
+	# copy report scripts
+	cp scripts/COVID* $analysis_dir/reports
+
   	#output
 	echo -e "Configs are ready to be edited:\n${log_dir}/config"
 	echo "*** INITIALIZATION COMPLETE ***"
@@ -197,11 +200,6 @@ elif [[ "$pipeline" == "sarscov2" ]]; then
 		"${resume}" \
 		"${testing}"
 
-	# run QC
-	# bash scripts/seq_qc.sh \
-	# 	"${output_dir}" \
-	# 	"${pipeline_config}"
-
 elif [[ "$pipeline" == "gisaid" ]]; then
 	#########################################################
 	# Eval, source
@@ -228,7 +226,7 @@ elif [[ "$pipeline" == "gisaid" ]]; then
     	fi
 	else
 		echo "----Missing fasta files"
-		#exit
+		exit
 	fi
 		
 	# log
@@ -242,8 +240,8 @@ elif [[ "$pipeline" == "gisaid" ]]; then
 		"${final_results}" \
 		"${subworkflow}" 2>> "$pipeline_log"
         
-	# # run stats
-    # bash run_analysis_pipeline.sh -m stats -n $project_id
+	# run stats
+    bash run_analysis_pipeline.sh -m stats -n $project_id
 
 	# log
 	message_cmd_log "--- GISAID PIPELINE COMPLETE ---"
