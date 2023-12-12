@@ -30,10 +30,12 @@ helpFunction()
    echo -e "\t-r Y,N option to resume -p GISAID workflow in progress"
    echo "Usage: $5 -t [OPTIONAL] testing options"
    echo -e "\t-r Y,N option to run test"
+   echo "Usage: $6 -e [OPTIONAL] working environment"
+   echo -e "\t-r iop,aws option to specify analysis enivornment"
    exit 1 # Exit script after printing help
 }
 
-while getopts "p:n:s:r:t:" opt
+while getopts "p:n:s:r:t:e:" opt
 do
    case "$opt" in
         p ) pipeline="$OPTARG" ;;
@@ -41,6 +43,7 @@ do
         s ) subworkflow="$OPTARG" ;;
        	r ) resume="$OPTARG" ;;
        	t ) testing="$OPTARG" ;;		
+       	e ) environment="$OPTARG" ;;		
 	? ) helpFunction ;; # Print helpFunction in case parameter is non-existent
    esac
 done
@@ -52,6 +55,7 @@ if [ -z "$pipeline" ] || [ -z "$project_id" ]; then
 fi
 if [ -z "$resume" ]; then resume="N";fi
 if [ -z "$testing" ]; then testing="N";fi
+if [ -z "$environment" ]; then environment="aws";fi
 #############################################################################################
 # other functions
 #############################################################################################
@@ -161,7 +165,12 @@ elif [[ "$pipeline" == "update" ]]; then
     #update the staphb toolkit
     staphb-tk --auto_update
 
-elif [[ "$pipeline" == "validation" ]]; then
+elif [[ "$pipeline" == "validate_iop" ]]; then
+	# init
+	bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p init -e aws
+	bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s lala -e aws
+
+elif [[ "$pipeline" == "validate" ]]; then
 	# remove prev runs
 	sudo rm -rf ~/output/OH-VH00648-231124
 
