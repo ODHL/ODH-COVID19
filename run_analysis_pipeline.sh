@@ -369,4 +369,3 @@ elif [[ "$pipeline" == "stats" ]]; then
 else
 	echo "Pipeline options (-p) must be init, sarscov2, gisaid, ncbi, stats, update"
 fi
-
