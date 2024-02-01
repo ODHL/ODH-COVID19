@@ -1,5 +1,5 @@
 ---
-title: "SARS_Report"
+title: "SARS_Report: REP_ID"
 author: "Samatha Chill"
 date: "REP_TODAY"
 output: html_document
@@ -10,6 +10,7 @@ editor_options:
 ```{r setup, include=FALSE}
 project_id="REP_ID"
 project_date="REP_DATE"
+analysis_date="REP_ADATE"
 ```
 
 ```{r, include=FALSE}
@@ -20,8 +21,8 @@ library(DT)
 
 ```{r, include=FALSE}
 #set dir
-project_dir=paste0("//LABAUTHDC2/Shared/Micro/WGS/Coronavirus_WGS/COVID-19 Fastas/",project_id)
-project_file=paste0(project_dir,"/analysis/reports/final_results_",project_date,".csv")
+project_dir=paste0("L://Micro/WGS/Coronavirus_WGS/COVID-19 Fastas/",project_id)
+project_file=paste0(project_dir,"/analysis/reports/final_results_",analysis_date,".csv")
 qc_file=paste0(project_dir,"/analysis/intermed/cecret_results.txt")
   
 #read in file
@@ -55,8 +56,7 @@ fail_qc=subset(qc_csv,sample_id %in% fail_df$sample_id)
 - Pangolin version: REP_PANGO
 - Nextclade version: REP_NC
 - Cecret version: REP_CECRET
-- Amplicon version: REP_AMP
-- Primer version: REP_AMP
+- Primer version: REP_PRIME
 - Insert version: REP_INSERT
 
 ### All Samples
@@ -76,7 +76,7 @@ ggplot(pass_qc, aes(x = depth)) +
 ```
 
 ```{r echo=FALSE, out.width = '100%'}
-knitr::include_graphics("//LABAUTHDC2//Shared//Micro//WGS//Coronavirus_WGS//COVID-19 Fastas//REP_ID//analysis//qc//fragment_plot.png", error = FALSE)
+knitr::include_graphics("L://Micro//WGS//Coronavirus_WGS//COVID-19 Fastas//REP_ID//analysis//qc//fragment_plot.png", error = FALSE)
 ```
 
 ```{r echo=FALSE}

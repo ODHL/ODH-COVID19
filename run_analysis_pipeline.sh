@@ -82,8 +82,8 @@ project_name_full=$(echo $project_id | sed 's:/*$::')
 project_name=$(echo $project_id | cut -f1 -d "_" | cut -f1 -d " ")
 
 # set date
-date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
-
+proj_date=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//' | sed "s/_SARS//g"`
+today_date=$(date '+%Y-%m-%d'); today_date=`echo $today_date | sed "s/-//g"`
 #############################################################################################
 # Dir, Configs
 #############################################################################################
@@ -96,7 +96,7 @@ tmp_dir=$output_dir/tmp
 pipeline_dir=$output_dir/pipeline
 
 # set files
-final_results=$analysis_dir/reports/final_results_$date_stamp.csv
+final_results=$analysis_dir/reports/final_results_$today_date.csv
 pipeline_log=$log_dir/pipeline_log.txt
 multiqc_config="$log_dir/config/config_multiqc.yaml"
 pipeline_config="$log_dir/config/config_pipeline.yaml"
@@ -114,28 +114,23 @@ if [[ "$pipeline" == "init" ]]; then
 	echo
 	echo "*** INITIALIZING PIPELINE ***"
 
-	#make directories, logs
-    if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
-
+	# make directories, logs
     ## parent
 	dir_list=(logs rawdata pipeline tmp analysis)
-    for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/$pd ]]; then mkdir -p $output_dir/$pd; fi; done
-
+    for pd in "${dir_list[@]}"; do makeDirs $output_dir/$pd; done
     ## tmp
     dir_list=(fastqc unzipped)
-    for pd in "${dir_list[@]}"; do if [[ ! -d $tmp_dir/$pd ]]; then mkdir -p $tmp_dir/$pd; fi; done
-
+    for pd in "${dir_list[@]}"; do makeDirs $tmp_dir/$pd; done
 	## logs
 	dir_list=(config manifests pipeline gisaid ncbi)
-    for pd in "${dir_list[@]}"; do if [[ ! -d $log_dir/$pd ]]; then mkdir -p $log_dir/$pd; fi; done
+    for pd in "${dir_list[@]}"; do makeDirs $log_dir/$pd; done
+
+	dir_list=(complete)
+    for pd in "${dir_list[@]}"; do makeDirs $log_dir/manifests/$pd; done
 
     ## analysis
     dir_list=(fasta intermed qc reports)
-    for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi; done
-	
-	#### fasta
-	dir_list=(not_uploaded gisaid_complete upload_failed)
-    for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/fasta/$pd ]]; then mkdir -p $analysis_dir/fasta/$pd; fi; done
+    for pd in "${dir_list[@]}"; do makeDirs $analysis_dir/$pd; done
 
     ##log file
     touch $pipeline_log
@@ -166,7 +161,7 @@ elif [[ "$pipeline" == "update" ]]; then
     staphb-tk --auto_update
 
 elif [[ "$pipeline" == "validate_iop" ]]; then
-	# init
+	sudo rm -rf ~/output/OH-VH00648-231124
 	bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p init -e aws
 	bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s lala -e aws
 
@@ -203,11 +198,12 @@ elif [[ "$pipeline" == "sarscov2" ]]; then
 		"${pipeline_config}" \
 		"${cecret_config}" \
 		"${multiqc_config}" \
-		"${date_stamp}" \
+		"${proj_date}" \
 		"${pipeline_log}" \
 		"${subworkflow}" \
 		"${resume}" \
-		"${testing}"
+		"${testing}" \
+		"${environment}"
 
 elif [[ "$pipeline" == "gisaid" ]]; then
 	#########################################################
@@ -221,22 +217,11 @@ elif [[ "$pipeline" == "gisaid" ]]; then
 	message_cmd_log "------------------------------------------------------------------------"
 	message_cmd_log "--- STARTING GISAID PIPELINE ---"
 
-   	# determine number of samples
-	fasta_number=`ls "$analysis_dir/fasta/not_uploaded"/ | wc -l`
-		
-	# run QC on fasta samples
-	if [[ "$fasta_number" -gt 0 ]]; then 
-		echo "----Processing $fasta_number samples"
-	        
-		# check metadata file exists
-        if [[ ! -f $config_metadata_file ]]; then
-        	echo "----Missing metadata file $config_metadata_file. File must be located in $log_dir. Review config_pipeline to update file name."
-        	exit
-    	fi
-	else
-		echo "----Missing fasta files"
-		exit
-	fi
+	# check metadata file exists
+    if [[ ! -f $config_metadata_file ]]; then
+        echo "----Missing metadata file $config_metadata_file. File must be located in $log_dir. Review config_pipeline to update file name."
+        exit
+    fi
 		
 	# log
 	echo "--uploading samples" >> $pipeline_log
@@ -247,11 +232,10 @@ elif [[ "$pipeline" == "gisaid" ]]; then
 		"${project_id}" \
 		"${pipeline_config}" \
 		"${final_results}" \
-		"${subworkflow}" 2>> "$pipeline_log"
+		"${subworkflow}"  \
+		"${environment}" \
+		"${proj_date}"
         
-	# run stats
-    bash run_analysis_pipeline.sh -m stats -n $project_id
-
 	# log
 	message_cmd_log "--- GISAID PIPELINE COMPLETE ---"
 	message_cmd_log "------------------------------------------------------------------------"
@@ -269,8 +253,8 @@ elif [[ "$pipeline" == "ncbi" ]]; then
 	message_cmd_log "--- STARTING NCBI PIPELINE ---"
 
 	# set args
-	date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
-	ncbi_mput=$log_dir/${project_id}_${date_stamp}_mput.txt
+	proj_date=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
+	ncbi_mput=$log_dir/${project_id}_${proj_date}_mput.txt
 	gisaid_results=$analysis_dir/intermed/gisaid_results.csv
 
     # Eval YAML args

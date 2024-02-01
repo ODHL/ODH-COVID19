@@ -29,3 +29,21 @@ message_stats_log(){
 	echo "$msg"
 
 }
+
+cleanmanifests(){
+	sed -i "s/[_-]SARS//g" $1
+	sed -i "s/-$project_name_full//g" $1
+	sed -i "s/-$project_name//g" $1		
+	sed -i "s/-OH//g" $1		
+}
+
+makeDirs(){
+	new=$1
+	if [[ ! -d $$new ]]; then mkdir -p $new; fi
+}
+
+get_config_info(){
+   version=`cat config/software_versions.txt | awk -v name=$2 '$1 ~ name' | awk -v pid="$1" '$2 ~ pid' | awk '{ print $3 }'`
+   # version=`cat config/software_versions.txt | awk -v name=pangolin '$1 ~ /name/'`
+   echo $version
+}

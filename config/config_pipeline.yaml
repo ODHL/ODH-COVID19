@@ -56,8 +56,11 @@ gisaid_cmd:
   iop: "$HOME/cli3"
 
 # reference files
+reference_dir:
+  aws: "/home/ubuntu/workflows/SARS_CoV_2_Workflow/refs"
+  iop: "$HOME/SARS_CoV_2_Workflow/refs"
 reference_genome: "MN908947.3.fasta"
-gff: "MN908947.3.gff"
+reference_gff: "MN908947.3.gff"
 
 # 4 for artic_V4.1_SARS-CoV-2.primer.bed
 # 5 for SARS-CoV-2_v5.2.0_1200.primer.bed
@@ -77,7 +80,7 @@ percent_n_cutoff: 50
 metadata_file: "metadata.csv"
 gisaid_auth: 
   aws: "/home/ubuntu/tools/gisaid/authtokens/gisaid.authtoken"
-  iop: "$HOME/gisaid.authtoken"
+  iop: "$HOME/gisaid.authton"
 
 submitter: "sevillas2"
 type: "betacoronavirus"

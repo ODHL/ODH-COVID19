@@ -6,11 +6,12 @@ project_name_full=$2
 pipeline_config=$3
 cecret_config=$4
 multiqc_config=$5
-date_stamp=$6
+proj_date=$6
 pipeline_log=$7
 subworkflow=$8
 resume=$9
 testing=${10}
+environment=${11}
 
 #########################################################
 # Pipeline controls
@@ -39,7 +40,7 @@ elif [[ $subworkflow == "ALL" ]]; then
     flag_batch="Y"
     flag_analysis="Y"
     flag_report="Y"
-    flag_cleanup="Y"
+    flag_cleanup="N"
 elif [[ $subworkflow == "lala" ]]; then
 	flag_download="N"
     flag_batch="N"
@@ -59,11 +60,14 @@ source $(dirname "$0")/functions.sh
 eval $(parse_yaml ${pipeline_config} "config_")
 
 # set command
-cecret_cmd=$config_cecret_cmd
-echo $cecret_cmd
-# set script
-fragment_plots_script=$config_frag_plot_script
+var="config_cecret_cmd_$environment"; cecret_cmd=${!var}
 
+# set scripts
+var="config_frag_plot_script_$environment"; fragment_plots_script=${!var}
+
+# date
+today_date=$(date '+%Y-%m-%d')
+today_date=`echo $today_date | sed "/-//g"`
 #########################################################
 # Set dirs, files, args
 #########################################################
@@ -85,7 +89,6 @@ fastqc_dir=$tmp_dir/fastqc
 merged_cecret=$intermed_dir/cecret_results.txt
 merged_nextclade=$intermed_dir/nextclade_results.csv
 merged_pangolin=$intermed_dir/lineage_report.csv
-merged_summary=$intermed_dir/cecret_summary.csv
 merged_fragment=$qc_dir/fragment.txt
 
 sample_id_file=$log_dir/manifests/sample_ids.txt
@@ -95,7 +98,7 @@ multiqc_log=$log_dir/multiqc_log.txt
 
 final_nextclade=$intermed_dir/final_nextclade.txt
 final_pangolin=$intermed_dir/final_pangolin.txt
-final_results=$analysis_dir/reports/final_results_$date_stamp.csv
+final_results=$intermed_dir/final_cecret_$today_date.csv
 
 # set project shorthand
 project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
@@ -103,18 +106,12 @@ project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
 # handle versioning
 #########################################################
 # pull versions from config
-pangolin_id=$config_pangolin_version
-nextclade_id=$config_nextclade_version
-cecret_id=$config_cecret_version
-primer_id=$config_primer_version
-insert_id=$config_insert_version
+pangolin_version=$(get_config_info $config_pangolin_version pangolin)
+nextclade_version=$(get_config_info $config_nextclade_version nextclade)
+cecret_version=$(get_config_info $config_cecret_version cecret)
+primer_version=$(get_config_info $config_primer_version primer)
+insert_version=$(get_config_info $config_insert_version insert)
 
-# Convert user selected numbers to complete software names
-pangolin_version=`cat config/software_versions.txt | awk '$1 ~ /pangolin/' | awk -v pid="$pangolin_id" '$2 ~ pid' | awk '{ print $3 }'`
-nextclade_version=`cat config/software_versions.txt | awk '$1 ~ /nextclade/' | awk -v pid="$nextclade_id" '$2 ~ pid' | awk '{ print $3 }'`
-cecret_version=`cat config/software_versions.txt | awk '$1 ~ /cecret/' | awk -v pid="$cecret_id" '$2 ~ pid' | awk '{ print $3 }'`
-primer_version=`cat config/software_versions.txt | awk '$1 ~ /primer/' | awk -v pid="$primer_id" '$2 ~ pid' | awk '{ print $3 }'`
-insert_version=`cat config/software_versions.txt | awk '$1 ~ /insert/' | awk -v pid="$insert_id" '$2 ~ pid' | awk '{ print $3 }'`
 if [[ "$pangolin_version" == "" ]] | [[ "$nextclade_version" == "" ]]; then
     echo "Choose the correct version of PANGOLIN/NEXTCLADE in /logs/config/config_pipeline.yaml"
     echo "PANGOLIN: $pangolin_version"
@@ -139,6 +136,7 @@ sed -i "s/$old_cmd/$new_cmd/" $cecret_config
 # check file existence
 # escape / with \/ for sed replacement
 # replace the cecret config file with the reference selected
+var="config_reference_dir_$environment"; config_reference_dir=${!var}
 reference_list=("reference_genome" "reference_gff")
 for ref_file in ${reference_list[@]}; do
     ref_line=$(cat "${pipeline_config}" | grep $ref_file)
@@ -174,7 +172,7 @@ sed -i "s/$old_cmd/$new_cmd/" $cecret_config
 message_cmd_log "------------------------------------------------------------------------"
 message_cmd_log "--- CONFIG INFORMATION ---"
 message_cmd_log "Cecret config: $cecret_config"
-message_cmd_log "Sequence run date: $date_stamp"
+message_cmd_log "Sequence run date: $proj_date"
 message_cmd_log "Analysis date: `date`"
 message_cmd_log "Pangolin version: $pangolin_version"
 message_cmd_log "Nexclade version: $nextclade_version"
@@ -196,6 +194,7 @@ echo "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`" >> $pipeline_log
 #############################################################################################
 # Project Downloads
 #############################################################################################	
+var="config_basespace_cmd_$environment"; config_basespace_cmd=${!var}
 if [[ $flag_download == "Y" ]]; then
 	echo "--Downloading sample data"
 
@@ -327,8 +326,8 @@ if [[ $flag_analysis == "Y" ]]; then
 	message_cmd_log "--Processing batches:"
 
 	# determine number of batches
-	batch_count=`ls $log_dir/manifests/batch* | wc -l`
-	batch_min=1
+	batch_count=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | tail -1 | cut -f2 -d"0" | cut -f1 -d"."`
+	batch_min=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | head -1 | cut -f2 -d"0" | cut -f1 -d"."`
 
 	#for each batch
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
@@ -403,10 +402,8 @@ if [[ $flag_analysis == "Y" ]]; then
 
 			# rename all ID files
 			## batch manifests
-			sed -i "s/[_-]SARS//g" $batch_manifest; sed -i "s/-$project_name_full//g" $batch_manifest
-			sed -i "s/-$project_name//g" $batch_manifest
-			sed -i "s/[_-]SARS//g" $samplesheet; sed -i "s/-$project_name_full//g" $samplesheet
-			sed -i "s/-$project_name//g" $samplesheet
+			cleanmanifests $batch_manifest
+			cleanmanifests $samplesheet
 			
 			## qc files renamed
 			for f in $tmp_dir/unzipped/*; do
@@ -436,41 +433,49 @@ if [[ $flag_analysis == "Y" ]]; then
 		#############################################################################################
 		# Reporting
 		#############################################################################################	
-		# add to  master cecret results
-		cat $pipeline_batch_dir/cecret_results.txt >> $merged_cecret
+		if [[ -f $pipeline_batch_dir/cecret_results.txt ]]; then
+			message_cmd_log "---- The pipeline completed batch #$batch_id at `date` "
+			message_cmd_log "--------------------------------------------------------"
 
-		# add to master nextclade results
-		cat $pipeline_batch_dir/nextclade/nextclade.csv >> $merged_nextclade
+			# add to  master cecret results
+			cat $pipeline_batch_dir/cecret_results.txt >> $merged_cecret
 
-	    # add to master pangolin results
-		cat $pipeline_batch_dir/pangolin/lineage_report.csv >> $merged_pangolin
+			# add to master nextclade results
+			cat $pipeline_batch_dir/nextclade/nextclade.csv >> $merged_nextclade
 
-		#add to master cecret summary
-		cat $pipeline_batch_dir/combined_summary.csv >> $merged_summary
+			# add to master pangolin results
+			cat $pipeline_batch_dir/pangolin/lineage_report.csv >> $merged_pangolin
 
-		# If QC report is being created, generate stats on fragment length
-        for f in $pipeline_batch_dir/samtools_stats/*.stats.txt; do
-    		frag_length=`cat $f | grep "average length" | awk '{print $4}'`
-        	sampleid=`echo $f | rev | cut -f1 -d "/" | rev | cut -f1 -d "."`
-	        echo -e "${sampleid}\t${frag_length}\t${batch_id}" >> $merged_fragment
-    	done
+			# If QC report is being created, generate stats on fragment length
+			for f in $pipeline_batch_dir/samtools_stats/*.stats.txt; do
+				frag_length=`cat $f | grep "average length" | awk '{print $4}'`
+				sampleid=`echo $f | rev | cut -f1 -d "/" | rev | cut -f1 -d "."`
+				echo -e "${sampleid}\t${frag_length}\t${batch_id}" >> $merged_fragment
+			done
 
-		# move FASTQC files
-		mv $pipeline_batch_dir/fastqc/* $fastqc_dir
-		
-		# move FASTA files
-		mv $pipeline_batch_dir/consensus/*fa $fasta_dir/not_uploaded
-		for f in $fasta_dir/not_uploaded/*; do
-			new=`echo $f | sed "s/.consensus//g"`
-			mv $f $new
-		done
+			# move FASTQC files
+			mv $pipeline_batch_dir/fastqc/* $fastqc_dir
+			
+			# move FASTA files
+			mv $pipeline_batch_dir/consensus/*fa $fasta_dir
+			for f in $fasta_dir/*; do
+				new=`echo $f | sed "s/.consensus//g"`
+				mv $f $new
+			done
 
-		#remove intermediate files
-		if [[ $flag_cleanup == "Y" ]]; then
-			sudo rm -r --force work
-			sudo rm -r --force */work
-			sudo rm -r --force $pipeline_batch_dir
-			sudo rm -r --force $fastq_batch_dir
+			#remove intermediate files
+			if [[ $flag_cleanup == "Y" ]]; then
+				sudo rm -r --force work
+				sudo rm -r --force */work
+				sudo rm -r --force $pipeline_batch_dir
+				sudo rm -r --force $fastq_batch_dir
+				mv $batch_manifest $log_dir/manifests/complete
+			fi
+		else
+			message_cmd_log "---- The pipeline failed `date`"
+			message_cmd_log "------Missing file: $pipeline_batch_dir/cecret_results.txt"
+			message_cmd_log "--------------------------------------------------------"
+			exit
 		fi
 	done
 fi
@@ -508,12 +513,11 @@ if [[ $flag_report == "Y" ]]; then
 	join <(sort $final_pangolin) <(sort $final_nextclade) -t $',' >> $final_results
 
 	# create R reports
-	todaysdate=$(date '+%Y-%m-%d')
 	script_list=( $analysis_dir/reports/COVID_Report_nofails.Rmd $analysis_dir/reports/COVID_Report.Rmd )
 	for f in ${script_list[@]}; do
-		sed -i "s/REP_TODAY/$todaysdate/g" $f
+		sed -i "s/REP_TODAY/$today_date/g" $f
 		sed -i "s/REP_ID/$project_name/g" $f
-		sed -i "s/REP_DATE/$date_stamp/g" $f
+		sed -i "s/REP_DATE/$proj_date/g" $f
 		sed -i "s/REP_PANGO/$pangolin_version/g" $f
 		sed -i "s/REP_NC/$nextclade_version/g" $f
 		sed -i "s/REP_CECRET/$cecret_version/g" $f
