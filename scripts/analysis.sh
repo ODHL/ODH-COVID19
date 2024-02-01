@@ -67,7 +67,6 @@ var="config_frag_plot_script_$environment"; fragment_plots_script=${!var}
 
 # date
 today_date=$(date '+%Y-%m-%d')
-today_date=`echo $today_date | sed "/-//g"`
 #########################################################
 # Set dirs, files, args
 #########################################################
@@ -98,7 +97,7 @@ multiqc_log=$log_dir/multiqc_log.txt
 
 final_nextclade=$intermed_dir/final_nextclade.txt
 final_pangolin=$intermed_dir/final_pangolin.txt
-final_results=$intermed_dir/final_cecret_$today_date.csv
+final_results=$intermed_dir/final_cecret.csv
 
 # set project shorthand
 project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")

@@ -31,7 +31,7 @@ pipeline_log=$log_dir/pipeline_log.txt
 gisaid_log="$log_dir/gisaid/gisaid_log_${project_id}_${date_stamp}.txt"
 gisaid_failed="$log_dir/gisaid/gisaid_failed_${project_id}_${date_stamp}.txt"
 gisaid_results="$intermed_dir/gisaid_results.csv"
-cecret_results="$intermed_dir/final_cecret_${proj_date}.csv"
+cecret_results="$intermed_dir/final_cecret.csv"
 FASTA_filename="batched_fasta_${project_id}_${date_stamp}.fasta"
 batched_fasta="$log_dir/gisaid/$FASTA_filename"
 
@@ -224,7 +224,7 @@ if [[ "$pipeline_qc" == "Y" ]]; then
 		epi_id=`echo $sample_line | grep -o "EPI_ISL_[0-9]*.[0-9]"`
 		sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-9]" | sed "s/SC//" | sed "s/202[1,2,3]/202/" | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
 		sample_id=`echo $sample_id | sed "s/20233/2023/g"`
-		sample_id=`echo $sample_id | sed "s/2022024/2024/g"`
+		sample_id=`echo $sample_id | sed "s/20242024/2024/g"`
 		echo "$sample_id,gisaid_pass,$epi_id" >> $gisaid_results
 	done
 
@@ -234,6 +234,7 @@ if [[ "$pipeline_qc" == "Y" ]]; then
         sample_line=`cat $gisaid_log | grep "${log_line}"`
 		epi_id=`echo $sample_line | grep -o "EPI_ISL_[0-9]*.[0-9]"`
         sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-9]" | sed "s/SC//" | sed "s/202[1,2]/202/" | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
+		sample_id=`echo $sample_id | sed "s/20242024/2024/g"`
 		echo "$sample_id,gisaid_fail,duplicated_id:$epi_id" >> $gisaid_results
 	done
 
@@ -243,18 +244,19 @@ if [[ "$pipeline_qc" == "Y" ]]; then
         sample_line=`cat $gisaid_log | grep "${log_line}"`
 		manifest_col=`echo $sample_line | cut -f3 -d"{" | sed "s/field_missing_error//g" | sed "s/\"//g" | sed 's/[\]//g' | sed "s/: , /,/g" | sed "s/: }//g" | sed "s/}//g"`
 		sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-9]" | sed "s/SC//" | sed "s/202[1,2]/202/" | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
+		sample_id=`echo $sample_id | sed "s/20242024/2024/g"`
 		echo "$sample_id,gisaid_fail,manifest_errors:$manifest_col" >> $gisaid_results
     done
 	
 	# merge gisaid results to final results file by sample id
-	if [[ -f $final_results ]]; then mv $final_results $intermed_dir/final_copy.csv; rm $final_results; fi
+	if [[ -f $final_results ]]; then mv $final_results $intermed_dir/final_copy.csv; fi
     sed -i "s/>Consensus_//g" $gisaid_results
 	sed -i "s/\.fa//g" $gisaid_results
 	sort $gisaid_results > tmp_gresults.txt
 	sort $cecret_results > tmp_cresults.txt
 	echo "sample_id,gisaid_status,gisaid_notes,pango_status,pangolin_lineage,pangolin_scorpio,pangolin_version,nextclade_clade,aa_substitutions" > $final_results
 	join <(sort -k1 -t, tmp_gresults.txt) <(sort -k1 -t, tmp_cresults.txt) -t $',' >> $final_results
-	rm tmp_cresults.txt tmp_gresults.txt
+	#rm tmp_cresults.txt tmp_gresults.txt
 
 	# create QC / analysis reports
 	nofails="scripts/COVID_Report_nofails.Rmd"
@@ -295,7 +297,10 @@ if [[ "$pipeline_qc" == "Y" ]]; then
 
 	check_length=`cat $final_results | wc -l`
 	if [[ $check_length -gt 5 ]]; then
-		tar -zcvf $fasta_dir.tar.gz $fasta_dir/
+		if [[ -d $fasta_dir ]]; then tar -zcvf $fasta_dir.tar.gz $fasta_dir/; fi
+		if [[ -f $fasta_dir.tar.gz ]]; then rm -rf $fasta_dir/; fi
+
+		stats_process $final_results
 		message_cmd_log "---- The pipeline completed upload at `date` "
 	fi
 fi

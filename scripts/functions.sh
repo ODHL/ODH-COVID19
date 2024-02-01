@@ -47,3 +47,21 @@ get_config_info(){
    # version=`cat config/software_versions.txt | awk -v name=pangolin '$1 ~ /name/'`
    echo $version
 }
+
+stats_process(){
+   final_in=$1
+
+   echo "----------------------- HEAD -----------------------"
+   head $final_in
+   echo "----------------------------------------------"
+
+   echo "----------------------- STATS -----------------------"
+   length=`cat $final_in | wc -l`
+   pass=`cat $final_in | grep -e "[Pp]ass"| wc -l`
+   fail=`cat $final_in | grep -e "[Ff]ail"| wc -l`
+
+   echo "Length: $length"
+   echo "Pass: $pass"
+   echo "Fail: $fail"
+   echo "----------------------------------------------"
+}
