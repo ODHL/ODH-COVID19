@@ -180,7 +180,7 @@ elif [[ "$pipeline" == "validate" ]]; then
     bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s ANALYZE -t Y -r N
     bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s REPORT -t Y
     # bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s lala -t Y
-elif [[ "$pipeline" == "sarscov2" ]]; then
+elif [[ "$pipeline" == "analysis" ]]; then
 	
 	#############################################################################################
     # Run CECRET pipeline
@@ -360,5 +360,5 @@ elif [[ "$pipeline" == "stats" ]]; then
 
 	message_stats_log "*** COMPLETE PIPELINE ***"
 else
-	echo "Pipeline options (-p) must be init, sarscov2, gisaid, ncbi, stats, update"
+	echo "Pipeline options (-p) must be init, analysis, gisaid, ncbi, stats, update"
 fi
