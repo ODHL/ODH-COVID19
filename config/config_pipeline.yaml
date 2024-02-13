@@ -45,20 +45,12 @@ nextclade_version: "10"
 cecret_version: "4"
 
 # cmds
-cecret_cmd: 
-  aws: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/SARS_CoV_2_Workflow/tools/Cecret -profile docker"
-  iop: "$HOME/SARS_CoV_2_Workflow/tools/Cecret -profile docker"
-basespace_cmd: 
-  aws: "/home/ubuntu/tools/basespace"
-  iop: "$HOME/basespace"
-gisaid_cmd: 
-  aws: "/home/ubuntu/.local/bin/cli3"
-  iop: "$HOME/cli3"
+cecret_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/SARS_CoV_2_Workflow/tools/Cecret -profile docker"
+basespace_cmd: "/home/ubuntu/tools/basespace"
+gisaid_cmd: "/home/ubuntu/.local/bin/cli3"
 
 # reference files
-reference_dir:
-  aws: "/home/ubuntu/workflows/SARS_CoV_2_Workflow/refs"
-  iop: "$HOME/SARS_CoV_2_Workflow/refs"
+reference_dir: "/home/ubuntu/workflows/SARS_CoV_2_Workflow/refs"
 reference_genome: "MN908947.3.fasta"
 reference_gff: "MN908947.3.gff"
 
@@ -71,17 +63,12 @@ primer_version: "5"
 insert_version: "5"
 
 # scripts
-frag_plot_script: 
-  aws: "/home/ubuntu/workflows/SARS_CoV_2_Workflow/scripts/fragment_plots.py"
-  iop: "$HOME/scripts/fragment_plots.py"
+frag_plot_script: "/home/ubuntu/workflows/SARS_CoV_2_Workflow/scripts/fragment_plots.py"
 
 ############# GISAID 
 percent_n_cutoff: 50
 metadata_file: "metadata.csv"
-gisaid_auth: 
-  aws: "/home/ubuntu/tools/gisaid/authtokens/gisaid.authtoken"
-  iop: "$HOME/gisaid.authton"
-
+gisaid_auth: "/home/ubuntu/tools/gisaid/authtokens/gisaid.authtoken"
 submitter: "sevillas2"
 type: "betacoronavirus"
 passage: "Original"

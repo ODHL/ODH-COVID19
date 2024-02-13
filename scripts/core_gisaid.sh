@@ -16,10 +16,19 @@ source $(dirname "$0")/functions.sh
 eval $(parse_yaml ${pipeline_config} "config_")
 
 #########################################################
+# Requirements
+#########################################################
+# check metadata file exists
+if [[ ! -f $config_metadata_file ]]; then
+    echo "----Missing metadata file $config_metadata_file. File must be located in $log_dir. Review config_pipeline to update file name."
+    exit
+fi
+
+#########################################################
 # Set dirs, files, args
 #########################################################
 # set date
-date_stamp=`date '+%Y_%m_%d'`
+today_date=$(date '+%Y-%m-%d'); today_date=`echo $today_date | sed "s/-//g"`
 
 # set dirs
 fasta_dir=$output_dir/analysis/fasta
@@ -28,40 +37,32 @@ intermed_dir=$output_dir/analysis/intermed
 
 # set files
 pipeline_log=$log_dir/pipeline_log.txt
-gisaid_log="$log_dir/gisaid/gisaid_log_${project_id}_${date_stamp}.txt"
-gisaid_failed="$log_dir/gisaid/gisaid_failed_${project_id}_${date_stamp}.txt"
+gisaid_log="$log_dir/gisaid/gisaid_log_${project_id}_${today_date}.txt"
+gisaid_failed="$log_dir/gisaid/gisaid_failed_${project_id}_${today_date}.txt"
+
 gisaid_results="$intermed_dir/gisaid_results.csv"
 cecret_results="$intermed_dir/final_cecret.csv"
-FASTA_filename="batched_fasta_${project_id}_${date_stamp}.fasta"
+
+FASTA_filename="batched_fasta_${project_id}_${today_date}.fasta"
 batched_fasta="$log_dir/gisaid/$FASTA_filename"
-
-meta_filename="batched_meta_${project_id}_${date_stamp}.csv"
+meta_filename="batched_meta_${project_id}_${today_date}.csv"
 batched_meta="$log_dir/gisaid/$meta_filename"
-
-# set gisaid ID
-var="config_gisaid_auth_$environment"; config_gisaid_auth=${!var}
-gisaid_auth="${config_gisaid_auth}"
-var="config_gisaid_cmd_$environment"; config_gisaid_cmd=${!var}
 #########################################################
 # Controls
 #########################################################
-# to run cleanup of frameshift samples, pass frameshift_flag
+flag_prep="N"
+flag_upload="N"
+flag_qc="N"
 if [[ $subworkflow == "PREP" ]]; then
-	pipeline_prep="Y"
-	pipeline_upload="N"
-	pipeline_qc="N"
+	flag_prep="Y"
 elif [[ $subworkflow == "UPLOAD" ]]; then
-	pipeline_prep="N"
-	pipeline_upload="Y"
-	pipeline_qc="N"
+	flag_upload="Y"
 elif [[ $subworkflow == "QC" ]]; then
-	pipeline_prep="N"
-	pipeline_upload="N"
-	pipeline_qc="Y"
+	flag_qc="Y"
 elif [[ $subworkflow == "ALL" ]]; then
-	pipeline_prep="Y"
-	pipeline_upload="Y"
-	pipeline_qc="Y"
+	flag_prep="Y"
+	flag_upload="Y"
+	flag_qc="Y"
 else
 	echo "CHOOSE CORRECT FLAG -s: PREP UPLOAD QC ALL"
 	echo "YOU CHOOSE: $subworkflow"
@@ -70,9 +71,11 @@ fi
 #########################################################
 # Code
 #########################################################
-if [[ "$pipeline_prep" == "Y" ]]; then
-	echo "----PREPARING FILES"
-    echo "Ending time: `date`" >> $pipeline_log
+if [[ "$flag_prep" == "Y" ]]; then
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--- STARTING GISAID PIPELINE ---"
+	message_cmd_log "----PREPARING FILES"
+    message_cmd_log "Ending time: `date`"
 	
 	# create files
     if [[ -f $batched_meta ]]; then rm $batched_meta; fi
@@ -136,7 +139,7 @@ if [[ "$pipeline_prep" == "Y" ]]; then
 					# year must be the collection year and not the analysis or sequencing year
 					# cut_id will be 2021064775 --> 1064775 OR 2022064775 --> 2064775 OR 2020064775 --> 1064775
 					year=`echo "${raw_date}" | awk '{split($0,a,"/"); print a[3]}' | tr -d '"'`
-					cut_id=`echo $sample_id | awk '{ gsub("2020","1") gsub("2022","2") gsub("2023","3"); print $0}'`
+					cut_id=`echo $sample_id | awk '{ gsub("2020","1") gsub("2022","2") gsub("2023","3") gsub("2024","4"); print $0}'`
 					virus_name="hCoV-19/USA/OH-ODH-SC$cut_id/$year"
 
 					#e.g. Europe / Germany / Bavaria / Munich
@@ -196,35 +199,39 @@ if [[ "$pipeline_prep" == "Y" ]]; then
     done
 fi
 
-if [[ "$pipeline_upload" == "Y" ]]; then
+if [[ "$flag_upload" == "Y" ]]; then
 	## QC check
 	if [[ -f $batched_fasta ]]; then
-		echo "----UPLOADING"
+		message_cmd_log "----UPLOADING"
 		# if this is a re-run, save previous log file
 		if [[ -f "${gisaid_log}" ]]; then mv ${gisaid_log} ${gisaid_log}_v1; fi
 		
-		$config_gisaid_cmd upload --metadata $batched_meta --fasta $batched_fasta --token $gisaid_auth --log $gisaid_log --failed $gisaid_failed --frameshift catch_novel
+		$config_gisaid_cmd upload \
+		--metadata $batched_meta \
+		--fasta $batched_fasta \
+		--token $config_gisaid_auth \
+		--log $gisaid_log \
+		--failed $gisaid_failed \
+		--frameshift catch_novel
 	fi
 fi
 
-if [[ "$pipeline_qc" == "Y" ]]; then
-	echo "----RUNNING QC"
+if [[ "$flag_qc" == "Y" ]]; then
+	message_cmd_log "----RUNNING QC"
 	# then pull line by grouping and determine metdata information
 	# uploaded: EPI_ID
 	# duplicated: EPI_ID
 	# errors: columns which had errors
-	samples_uploaded=`cat $gisaid_log | grep "epi_isl_id" | grep -v "validation_error" | grep -o "SC[0-9]*./202[0-9]"`
-	samples_duplicated=`cat $gisaid_log | grep "existing_ids" | grep -o "SC[0-9]*./202[0-9]"`
-	samples_manifest_errors=`cat $gisaid_log | grep "field_missing" | grep -o "SC[0-9]*./202[0-9]"`
+	samples_uploaded=`cat $gisaid_log | grep "epi_isl_id" | grep -v "validation_error" | grep -o "SC[0-9]*./202[0-4]"`
+	samples_duplicated=`cat $gisaid_log | grep "existing_ids" | grep -o "SC[0-9]*./202[0-4]"`
+	samples_manifest_errors=`cat $gisaid_log | grep "field_missing" | grep -o "SC[0-9]*./202[0-4]"`
 
 	## for samples that successfully uploaded, pull the GISAID ID
 	## move samples to uploaded folder
 	for log_line in ${samples_uploaded[@]}; do
 		sample_line=`cat $gisaid_log | grep "${log_line}"`
 		epi_id=`echo $sample_line | grep -o "EPI_ISL_[0-9]*.[0-9]"`
-		sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-9]" | sed "s/SC//" | sed "s/202[1,2,3]/202/" | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
-		sample_id=`echo $sample_id | sed "s/20233/2023/g"`
-		sample_id=`echo $sample_id | sed "s/20242024/2024/g"`
+		sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-4]" | cut -c 4- | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
 		echo "$sample_id,gisaid_pass,$epi_id" >> $gisaid_results
 	done
 
@@ -233,8 +240,7 @@ if [[ "$pipeline_qc" == "Y" ]]; then
 	for log_line in ${samples_duplicated[@]}; do
         sample_line=`cat $gisaid_log | grep "${log_line}"`
 		epi_id=`echo $sample_line | grep -o "EPI_ISL_[0-9]*.[0-9]"`
-        sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-9]" | sed "s/SC//" | sed "s/202[1,2]/202/" | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
-		sample_id=`echo $sample_id | sed "s/20242024/2024/g"`
+		sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-4]" | cut -c 4- | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
 		echo "$sample_id,gisaid_fail,duplicated_id:$epi_id" >> $gisaid_results
 	done
 
@@ -243,8 +249,7 @@ if [[ "$pipeline_qc" == "Y" ]]; then
 	for log_line in ${samples_manifest_errors[@]}; do
         sample_line=`cat $gisaid_log | grep "${log_line}"`
 		manifest_col=`echo $sample_line | cut -f3 -d"{" | sed "s/field_missing_error//g" | sed "s/\"//g" | sed 's/[\]//g' | sed "s/: , /,/g" | sed "s/: }//g" | sed "s/}//g"`
-		sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-9]" | sed "s/SC//" | sed "s/202[1,2]/202/" | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
-		sample_id=`echo $sample_id | sed "s/20242024/2024/g"`
+		sample_id=`echo $sample_line | grep -o "SC[0-9]*./202[0-4]" | cut -c 4- | awk 'BEGIN{FS=OFS="/"}{ print $2$1}'`
 		echo "$sample_id,gisaid_fail,manifest_errors:$manifest_col" >> $gisaid_results
     done
 	
@@ -258,49 +263,17 @@ if [[ "$pipeline_qc" == "Y" ]]; then
 	join <(sort -k1 -t, tmp_gresults.txt) <(sort -k1 -t, tmp_cresults.txt) -t $',' >> $final_results
 	#rm tmp_cresults.txt tmp_gresults.txt
 
-	# create QC / analysis reports
-	nofails="scripts/COVID_Report_nofails.Rmd"
-	fails="scripts/COVID_Report.Rmd"
-
-	cp $nofails $output_dir/analysis/reports
-	cp $fails $output_dir/analysis/reports
-		
-	# definte output RMDs
-	nofails="$output_dir/analysis/reports/COVID_Report_nofails.Rmd"
-	fails="$output_dir/analysis/reports/COVID_Report.Rmd"
-
-	# define dates
-	form_date=`date '+%Y-%m-%d'`
-	a_date=`date | echo $form_date | sed "s/-//g"`
-
-	# version numbers
-	pangolin_version=$(get_config_info $config_pangolin_version pangolin)
-	nextclade_version=$(get_config_info $config_nextclade_version nextclade)
-	cecret_version=$(get_config_info $config_cecret_version cecret)
-	primer_version=$(get_config_info $config_primer_version primer)
-	insert_version=$(get_config_info $config_insert_version insert)
-
-	sed -i "s/REP_TODAY/$form_date/g" $nofails
-	sed -i "s/REP_ID/$project_id/g" $nofails
-	sed -i "s/REP_DATE/20$proj_date/g" $nofails
-	sed -i "s/REP_ADATE/$a_date/g" $nofails
-
-	sed -i "s/REP_TODAY/$form_date/g" $fails
-	sed -i "s/REP_ID/$project_id/g" $fails
-	sed -i "s/REP_DATE/20$proj_date/g" $fails
-	sed -i "s/REP_ADATE/$a_date/g" $fails
-	sed -i "s/REP_PANGO/$pangolin_version/g" $fails
-	sed -i "s/REP_NC/$nextclade_version/g" $fails
-	sed -i "s/REP_CECRET/$cecret_version/g" $fails
-	sed -i "s/REP_PRIME/$primer_version/g" $fails
-	sed -i "s/REP_INSERT/$insert_version/g" $fails
-
 	check_length=`cat $final_results | wc -l`
-	if [[ $check_length -gt 5 ]]; then
+	if [[ $check_length -gt 2 ]]; then
 		if [[ -d $fasta_dir ]]; then tar -zcvf $fasta_dir.tar.gz $fasta_dir/; fi
 		if [[ -f $fasta_dir.tar.gz ]]; then rm -rf $fasta_dir/; fi
-
-		stats_process $final_results
+		
+		# log
 		message_cmd_log "---- The pipeline completed upload at `date` "
+		message_cmd_log "--- GISAID PIPELINE COMPLETE ---"
+		message_cmd_log "------------------------------------------------------------------------"
+	else 
+		echo "FAILED: $final_results"
+		exit
 	fi
 fi
