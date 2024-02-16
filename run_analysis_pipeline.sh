@@ -113,7 +113,8 @@ if [[ "$pipeline" == "init" ]]; then
 	## logs
 	dir_list=(config manifests/complete pipeline gisaid ncbi)
     for pd in "${dir_list[@]}"; do makeDirs $log_dir/$pd; done
-
+	touch $log_dir/manifests/sample_ids.txt
+	
 	## tmp
     dir_list=(qc)
     for pd in "${dir_list[@]}"; do makeDirs $tmp_dir/$pd; done

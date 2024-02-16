@@ -76,7 +76,7 @@ ggplot(pass_qc, aes(x = depth)) +
 ```
 
 ```{r echo=FALSE, out.width = '100%'}
-knitr::include_graphics("L://Micro//WGS//Coronavirus_WGS//COVID-19 Fastas//REP_ID//analysis//qc//fragment_plot.png", error = FALSE)
+knitr::include_graphics("L://Micro//WGS//Coronavirus_WGS//COVID-19 Fastas//REP_ID//analysis//intermed//fragment_plot.png", error = FALSE)
 ```
 
 ```{r echo=FALSE}

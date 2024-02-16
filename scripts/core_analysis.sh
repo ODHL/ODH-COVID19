@@ -63,7 +63,6 @@ today_date=`echo $today_date | sed "s/-//g"`
 # set dir
 log_dir=$output_dir/logs
 manifest_dir=$log_dir/manifests
-sample_id_file="$manifest_dir/sample_ids.txt"
 
 tmp_dir=$output_dir/tmp
 tmp_qc_dir=$tmp_dir/qc
@@ -84,10 +83,7 @@ fragement_plot=$intermed_dir/fragment_plot.png
 final_nextclade=$intermed_dir/final_nextclade.txt
 final_pangolin=$intermed_dir/final_pangolin.txt
 final_results=$intermed_dir/final_cecret.csv
-sample_id_file=$log_dir/manifests/sample_ids.txt
-
-# set project shorthand
-project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
+sample_id_file=$manifest_dir/sample_ids.txt
 
 #########################################################
 # handle versioning
@@ -133,6 +129,25 @@ ref_file="amplicon_bed"
 ref_path=`echo $config_reference_dir/${insert_version/"$ref_file": /} | tr -d '"'`
 update_config_refs $ref_file $ref_path $cecret_config
 
+#########################################################
+# project variables
+#########################################################
+# set project shorthand
+project_name=$(echo $project_name_full | cut -f1 -d "_" | cut -f1 -d " ")
+
+# read in sample list
+IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file	
+
+# create proj tmp dir to enable multiple projects to be run simultaneously
+project_number=`$config_basespace_cmd list projects --filter-term="${project_name_full}" | sed -n '4 p' | awk '{split($0,a,"|"); print a[3]}' | sed 's/ //g'`
+
+# set command 
+if [[ $resume == "Y" ]]; then
+	analysis_cmd=`echo $config_cecret_cmd -resume`
+else
+	analysis_cmd=`echo $config_cecret_cmd`
+fi
+
 #############################################################################################
 # LOG INFO TO CONFIG
 #############################################################################################
@@ -153,24 +168,6 @@ message_cmd_log "--- STARTING ANALYSIS ---"
 message_cmd_log "Starting time: `date`"
 message_cmd_log "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`"
 
-#read in text file with all project id's
-IFS=$'\n' read -d '' -r -a sample_list < config/sample_ids.txt
-if [[ -f $sample_id_file ]];then rm $sample_id_file; fi
-for f in ${sample_list[@]}; do
-	if [[ $f != "specimen_id" ]]; then 	echo $f-$project_name >> $sample_id_file; fi
-done
-IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file	
-
-# create proj tmp dir to enable multiple projects to be run simultaneously
-project_number=`$config_basespace_cmd list projects --filter-term="${project_name_full}" | sed -n '4 p' | awk '{split($0,a,"|"); print a[3]}' | sed 's/ //g'`
-
-# set command 
-if [[ $resume == "Y" ]]; then
-	analysis_cmd=`echo $config_cecret_cmd -resume`
-else
-	analysis_cmd=`echo $config_cecret_cmd`
-fi
-
 #############################################################################################
 # Batching
 #############################################################################################
@@ -178,6 +175,14 @@ fi
 # Batch count depends on user input from pipeline_config.yaml
 if [[ $flag_batch == "Y" ]]; then
 	echo "--Creating batch files"
+
+	#read in text file with all project id's
+	IFS=$'\n' read -d '' -r -a raw_list < config/sample_ids.txt
+	if [[ -f $sample_id_file ]];then rm $sample_id_file; fi
+	for f in ${raw_list[@]}; do
+		if [[ $f != "specimen_id" ]]; then 	echo $f-$project_name >> $sample_id_file; fi
+	done
+	IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file
 
 	# break project into batches of N = batch_limit create manifests for each
 	sample_count=1
@@ -260,10 +265,11 @@ fi
 #############################################################################################
 # Project Downloads
 #############################################################################################	
-# determine number of batches
-batch_count=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | tail -1 | cut -f2 -d"0" | cut -f1 -d"."`
-batch_min=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | head -1 | cut -f2 -d"0" | cut -f1 -d"."`
 if [[ $flag_download == "Y" ]]; then
+	# determine number of batches
+	batch_count=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | tail -1 | cut -f2 -d"0" | cut -f1 -d"."`
+	batch_min=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | head -1 | cut -f2 -d"0" | cut -f1 -d"."`
+
 	# check that access to the projectID is available before attempting to download
 	if [ -z "$project_number" ]; then
 		echo "The project id was not found from $project_name_full. Review available project names below and try again"
@@ -301,8 +307,10 @@ if [[ $flag_download == "Y" ]]; then
 			# move needed files to general tmp dir
 			zip=`ls $tmp_dir/${sample_id}*/*.zip | head -1`
 			if [[ ! -d $tmp_dir/${sample_id} ]]; then mkdir -p $tmp_dir/${sample_id}; fi
-			unzip -o -q ${zip} -d $tmp_dir/${sample_id}
-			mv $tmp_dir/${sample_id}/ma/* $tmp_qc_dir/
+			if [[ $zip != "" ]]; then 
+				unzip -o -q ${zip} -d $tmp_dir/${sample_id}
+				mv $tmp_dir/${sample_id}/ma/* $tmp_qc_dir/			
+			fi
 		done
 
 		# move to final dir, clean
@@ -332,6 +340,10 @@ fi
 # Analysis
 #############################################################################################
 if [[ $flag_analysis == "Y" ]]; then
+	# determine number of batches
+	batch_count=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | tail -1 | cut -f2 -d"0" | cut -f1 -d"."`
+	batch_min=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | head -1 | cut -f2 -d"0" | cut -f1 -d"."`
+
 	#log
 	message_cmd_log "--Processing batches:"
 
@@ -350,22 +362,21 @@ if [[ $flag_analysis == "Y" ]]; then
 		# move to project dir
 		cd $pipeline_batch_dir/$project_number
 		
+		# read text file
+		IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest
+		n_samples=`wc -l < $batch_manifest`
+		message_cmd_log "----Batch_$batch_id ($n_samples samples)"
+
+		# cecret command
+		config_cecret_cmd_line="$analysis_cmd --sample_sheet $samplesheet --reads_type paired --outdir $pipeline_batch_dir"
+		echo $config_cecret_cmd_line
+
 		if [[ $resume == "Y" ]]; then
 			message_cmd_log "----Resuming pipeline"
 
 			# deploy cecret
-			config_cecret_cmd_line="$analysis_cmd --sample_sheet $samplesheet --reads_type paired --outdir $pipeline_batch_dir"
-			echo $config_cecret_cmd_line
 			$config_cecret_cmd_line
 		else
-			# read text file
-			IFS=$'\n' read -d '' -r -a sample_list < $batch_manifest
-
-			# print number of lines in file without file name "<"
-			n_samples=`wc -l < $batch_manifest`
-			message_cmd_log "----Batch_$batch_id ($n_samples samples)"
-
-			#log
 			message_cmd_log "------CECRET"
 			message_cmd_log "-------Starting time: `date`"
 			message_cmd_log "-------Starting space: `df . | sed -n '2 p' | awk '{print $5}'`"
@@ -374,14 +385,9 @@ if [[ $flag_analysis == "Y" ]]; then
 			cp $cecret_config $pipeline_batch_dir
 
 			# deploy cecret
-			config_cecret_cmd_line="$config_cecret_cmd --sample_sheet $samplesheet --reads_type paired --outdir $pipeline_batch_dir"
-			echo $config_cecret_cmd_line
 			$config_cecret_cmd_line
 		fi
 		
-		# log
-		message_cmd_log "-------Ending space: `df . | sed -n '2 p' | awk '{print $5}'`"
-
 		#############################################################################################
 		# Reporting
 		#############################################################################################	
