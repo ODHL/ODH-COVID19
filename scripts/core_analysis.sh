@@ -151,16 +151,6 @@ fi
 #############################################################################################
 # LOG INFO TO CONFIG
 #############################################################################################
-message_cmd_log "------------------------------------------------------------------------"
-message_cmd_log "--- CONFIG INFORMATION ---"
-message_cmd_log "Cecret config: $cecret_config"
-message_cmd_log "Sequence run date: $proj_date"
-message_cmd_log "Analysis date: `date`"
-message_cmd_log "Pangolin version: $pangolin_version"
-message_cmd_log "Nexclade version: $nextclade_version"
-message_cmd_log "Cecret version: $cecret_version"
-message_cmd_log "Amplicon version: $primer_version"
-message_cmd_log "Insert version: $insert_version"
 
 message_cmd_log "------------------------------------------------------------------------"
 message_cmd_log "--- STARTING ANALYSIS ---"
@@ -174,13 +164,16 @@ message_cmd_log "Starting space: `df . | sed -n '2 p' | awk '{print $5}'`"
 # All project ID's download from BASESPACE will be processed into batches
 # Batch count depends on user input from pipeline_config.yaml
 if [[ $flag_batch == "Y" ]]; then
-	echo "--Creating batch files"
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--BATCHING"
+	message_cmd_log "------------------------------------------------------------------------"
 
 	#read in text file with all project id's
 	IFS=$'\n' read -d '' -r -a raw_list < config/sample_ids.txt
 	if [[ -f $sample_id_file ]];then rm $sample_id_file; fi
 	for f in ${raw_list[@]}; do
-		if [[ $f != "specimen_id" ]]; then 	echo $f-$project_name >> $sample_id_file; fi
+		# if [[ $f != "specimen_id" ]]; then 	echo $f-$project_name >> $sample_id_file; fi
+		if [[ $f != "specimen_id" ]]; then 	echo $f >> $sample_id_file; fi
 	done
 	IFS=$'\n' read -d '' -r -a sample_list < $sample_id_file
 
@@ -266,6 +259,10 @@ fi
 # Project Downloads
 #############################################################################################	
 if [[ $flag_download == "Y" ]]; then
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--DOWNLOADING"
+	message_cmd_log "------------------------------------------------------------------------"
+
 	# determine number of batches
 	batch_count=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | tail -1 | cut -f2 -d"0" | cut -f1 -d"."`
 	batch_min=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | head -1 | cut -f2 -d"0" | cut -f1 -d"."`
@@ -278,7 +275,7 @@ if [[ $flag_download == "Y" ]]; then
 	fi
 
 	# output start message
-	message_cmd_log "--Downloading analysis files (this may take a few minutes to begin)"
+	message_cmd_log "--This may take a few minutes to begin)"
 	message_cmd_log "---Starting time: `date`"
 	
 	# download full zips
@@ -305,7 +302,7 @@ if [[ $flag_download == "Y" ]]; then
 			
 			# unzip analysis file downloaded from DRAGEN to sample tmp dir - used in QC
 			# move needed files to general tmp dir
-			zip=`ls $tmp_dir/${sample_id}*/*.zip | head -1`
+			zip=`ls $tmp_dir/${sample_id}*/*.zip | head -1 | sed "s/_SARS//g"`
 			if [[ ! -d $tmp_dir/${sample_id} ]]; then mkdir -p $tmp_dir/${sample_id}; fi
 			if [[ $zip != "" ]]; then 
 				unzip -o -q ${zip} -d $tmp_dir/${sample_id}
@@ -313,16 +310,16 @@ if [[ $flag_download == "Y" ]]; then
 			fi
 		done
 
-		# move to final dir, clean
+		#move to final dir, clean
 		mv $tmp_batch_dir/*/*gz $fastq_batch_dir
 		for f in $fastq_batch_dir/*gz; do
 			new=$(clean_file_names $f)
-			mv $f $new
+			if [[ $f != $new ]]; then mv $f $new; fi
 		done
 		rm $tmp_qc_dir/dragen* $tmp_qc_dir/st*
 		for f in $tmp_qc_dir/*; do
 			new=$(clean_file_names $f)
-			mv $f $new
+			if [[ $f != $new ]]; then mv $f $new; fi
 		done
 		clean_file_insides $samplesheet
 		clean_file_insides $batch_manifest
@@ -340,12 +337,22 @@ fi
 # Analysis
 #############################################################################################
 if [[ $flag_analysis == "Y" ]]; then
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--- CONFIG INFORMATION ---"
+	message_cmd_log "Cecret config: $cecret_config"
+	message_cmd_log "Sequence run date: $proj_date"
+	message_cmd_log "Analysis date: `date`"
+	message_cmd_log "Pangolin version: $pangolin_version"
+	message_cmd_log "Nexclade version: $nextclade_version"
+	message_cmd_log "Cecret version: $cecret_version"
+	message_cmd_log "Amplicon version: $primer_version"
+	message_cmd_log "Insert version: $insert_version"
+	message_cmd_log "------------------------------------------------------------------------"
+
 	# determine number of batches
 	batch_count=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | tail -1 | cut -f2 -d"0" | cut -f1 -d"."`
 	batch_min=`ls $log_dir/manifests/batch* | rev | cut -d'/' -f 1 | rev | head -1 | cut -f2 -d"0" | cut -f1 -d"."`
 
-	#log
-	message_cmd_log "--Processing batches:"
 
 	#for each batch
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
@@ -372,12 +379,17 @@ if [[ $flag_analysis == "Y" ]]; then
 		echo $config_cecret_cmd_line
 
 		if [[ $resume == "Y" ]]; then
-			message_cmd_log "----Resuming pipeline"
+			message_cmd_log "------------------------------------------------------------------------"
+			message_cmd_log "--RESUMING"
+			message_cmd_log "------------------------------------------------------------------------"
+
 
 			# deploy cecret
 			$config_cecret_cmd_line
 		else
-			message_cmd_log "------CECRET"
+			message_cmd_log "------------------------------------------------------------------------"
+			message_cmd_log "--CECRET"
+			message_cmd_log "------------------------------------------------------------------------"
 			message_cmd_log "-------Starting time: `date`"
 			message_cmd_log "-------Starting space: `df . | sed -n '2 p' | awk '{print $5}'`"
 		
@@ -418,11 +430,11 @@ if [[ $flag_analysis == "Y" ]]; then
 			mv $pipeline_batch_dir/consensus/*fa $fasta_dir
 			for f in $fasta_dir/*; do
 				new=`echo $f | sed "s/.consensus//g"`
-				mv $f $new
+				if [[ $f != $new ]]; then mv $f $new; fi
 			done
 
 			# move logs
-			cp $pipeline_batch_dir/logs/* $log_dir/pipeline/
+			cp $pipeline_batch_dir/$project_number/* $log_dir/pipeline/
 			mv $batch_manifest $manifest_dir/complete
 
 			#remove intermediate files
@@ -443,7 +455,9 @@ fi
 #############################################################################################
 if [[ $flag_report == "Y" ]]; then
 	# log
-	message_cmd_log "--Creating QC Report"
+	message_cmd_log "------------------------------------------------------------------------"
+	message_cmd_log "--REPORT"
+	message_cmd_log "------------------------------------------------------------------------"
 	message_cmd_log "---Starting time: `date`"
 	message_cmd_log "---Starting space: `df . | sed -n '2 p' | awk '{print $5}'`"
 
@@ -452,6 +466,7 @@ if [[ $flag_report == "Y" ]]; then
 	multiqc -f -v \
 	-c $multiqc_config \
 	$tmp_qc_dir \
+	--no-ansi \
 	-o $tmp_dir 2>&1 | tee -a $multiqc_log
 	mv $tmp_dir/multiqc_report.html $report_dir
 

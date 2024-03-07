@@ -99,7 +99,14 @@ cecret_config="$log_dir/config/config_cecret.config"
 #############################################################################################
 # Runmodes
 #############################################################################################
-if [[ "$pipeline" == "init" ]]; then
+if [[ "$pipeline" == "phase1" ]]; then
+	bash run_analysis_pipeline.sh -n $project_id -p init
+
+	bash run_analysis_pipeline.sh -n $project_id -p analysis -s ALL
+
+	bash run_analysis_pipeline.sh -n $project_id -p gisaid -s ALL
+
+elif [[ "$pipeline" == "init" ]]; then
 	
 	# print message
 	echo
@@ -146,19 +153,6 @@ if [[ "$pipeline" == "init" ]]; then
 	echo "*** INITIALIZATION COMPLETE ***"
 	echo
 
-
-elif [[ "$pipeline" == "validate" ]]; then
-	# remove prev runs
-	sudo rm -rf ~/output/OH-VH00648-231124
-
-	# init
-	bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p init
-
-	# run through workflow
-    bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s DOWNLOAD
-    bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s BATCH -t Y
-    bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s ANALYZE -t Y -r N
-    bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s REPORT -t Y
 elif [[ "$pipeline" == "analysis" ]]; then
 	
 	#############################################################################################

@@ -32,8 +32,8 @@ message_stats_log(){
 
 clean_file_insides(){
 	sed -i "s/[_-]SARS//g" $1
-	sed -i "s/-$project_name_full//g" $1
-	sed -i "s/-$project_name//g" $1		
+	sed -i "s/[-_]$project_name_full//g" $1
+	sed -i "s/[-_]$project_name//g" $1
 	sed -i "s/-OH//g" $1
    sed -i "s/_001//g" $1
    sed -i "s/_S[0-9]*_//g" $1
@@ -41,7 +41,7 @@ clean_file_insides(){
 }
 
 clean_file_names(){
-	out=`echo $1 | sed "s/[_-]SARS//g" | sed "s/-$project_name_full//g" | sed "s/-$project_name//g"`
+	out=`echo $1 | sed "s/[_-]SARS//g" | sed "s/[_-]$project_name_full//g" | sed "s/[_-]$project_name//g"`
 	out=`echo $out | sed "s/-OH//g" | sed "s/_S[0-9]*//g" | sed "s/_L001//g" | sed "s/_001//g" | sed "s/_R/.R/g"`
    echo $out
 }

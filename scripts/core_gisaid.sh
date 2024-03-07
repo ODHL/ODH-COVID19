@@ -29,7 +29,7 @@ fi
 #########################################################
 # set date
 today_date=$(date '+%Y-%m-%d'); today_date=`echo $today_date | sed "s/-//g"`
-
+today_date="20240306"
 # set dirs
 fasta_dir=$output_dir/analysis/fasta
 log_dir=$output_dir/logs
@@ -261,10 +261,10 @@ if [[ "$flag_qc" == "Y" ]]; then
 	sort $cecret_results > tmp_cresults.txt
 	echo "sample_id,gisaid_status,gisaid_notes,pango_status,pangolin_lineage,pangolin_scorpio,pangolin_version,nextclade_clade,aa_substitutions" > $final_results
 	join <(sort -k1 -t, tmp_gresults.txt) <(sort -k1 -t, tmp_cresults.txt) -t $',' >> $final_results
-	#rm tmp_cresults.txt tmp_gresults.txt
+	rm tmp_cresults.txt tmp_gresults.txt
 
 	check_length=`cat $final_results | wc -l`
-	if [[ $check_length -gt 2 ]]; then
+	if [[ $check_length -gt 10 ]]; then
 		if [[ -d $fasta_dir ]]; then tar -zcvf $fasta_dir.tar.gz $fasta_dir/; fi
 		if [[ -f $fasta_dir.tar.gz ]]; then rm -rf $fasta_dir/; fi
 		
