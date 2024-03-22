@@ -22,7 +22,8 @@ batch_limit: "50"
 # 28 for 4.3.1-pdata-1.22
 # 29 for 4.3.1-pdata-1.23.1
 # 30 for 4.3.1-pdata-1.25.1
-pangolin_version: "30"
+# 31 for 4.3.1-pdata-1.26
+pangolin_version: "31"
 
 # nextclade version
 # to check versions available to go: https://hub.docker.com/r/nextstrain/nextclade/tags
@@ -44,7 +45,8 @@ nextclade_version: "11"
 # 2 for 2.0
 # 3 for 3.7.20230613
 # 4 for v3.10.20231205
-cecret_version: "4"
+# 5 for v3.13.20240319
+cecret_version: "5"
 
 # cmds
 cecret_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/SARS_CoV_2_Workflow/tools/Cecret -profile docker"
@@ -52,9 +54,9 @@ basespace_cmd: "/home/ubuntu/tools/basespace"
 gisaid_cmd: "/home/ubuntu/.local/bin/cli3"
 
 # reference files
-reference_dir: "/home/ubuntu/workflows/refs"
+reference_dir: "/home/ubuntu/refs"
 reference_genome: "MN908947.3.fasta"
-reference_gff: "MN908947.3.gff"
+gff: "MN908947.3.gff"
 
 # 4 for artic_V4.1_SARS-CoV-2.primer.bed
 # 5 for SARS-CoV-2_v5.2.0_1200.primer.bed
