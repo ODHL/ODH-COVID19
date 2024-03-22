@@ -114,7 +114,7 @@ update_config "nextclade:latest" "nextclade:$nextclade_version" $cecret_config
 # check file existence
 # escape / with \/ for sed replacement
 # replace the cecret config file with the reference selected
-reference_list=("reference_genome" "reference_gff")
+reference_list=("reference_genome" "gff")
 for ref_file in ${reference_list[@]}; do
     ref_line=$(cat "${pipeline_config}" | grep $ref_file)
     ref_path=`echo $config_reference_dir/${ref_line/"$ref_file": /} | tr -d '"'`
@@ -375,7 +375,9 @@ if [[ $flag_analysis == "Y" ]]; then
 		message_cmd_log "----Batch_$batch_id ($n_samples samples)"
 
 		# cecret command
-		config_cecret_cmd_line="$analysis_cmd --sample_sheet $samplesheet --reads_type paired --outdir $pipeline_batch_dir"
+		echo "cp $cecret_config $pipeline_batch_dir"
+		cp $cecret_config $pipeline_batch_dir
+		config_cecret_cmd_line="$analysis_cmd --sample_sheet $samplesheet --outdir $pipeline_batch_dir"
 		echo $config_cecret_cmd_line
 
 		if [[ $resume == "Y" ]]; then
