@@ -7,3 +7,9 @@ gisaid_upload/
 .nextflow*
 # ignore mkdocs site
 site/*
+
+# ignore kraken for now
+refs/kraken2db
+
+# ignore temp ids
+config/holdids*

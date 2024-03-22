@@ -78,60 +78,57 @@ project_name_full=$(echo $project_id | sed 's:/*$::')
 project_name=$(echo $project_id | cut -f1 -d "_" | cut -f1 -d " ")
 
 # set date
-date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
-
+proj_date=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//' | sed "s/_SARS//g"`
+today_date=$(date '+%Y-%m-%d'); today_date=`echo $today_date | sed "s/-//g"`
 #############################################################################################
 # Dir, Configs
 #############################################################################################
 # set dirs
 output_dir="/home/ubuntu/output/$project_name"
 log_dir=$output_dir/logs
-analysis_dir=$output_dir/analysis
-rawdata_dir=$output_dir/rawdata
 tmp_dir=$output_dir/tmp
-pipeline_dir=$output_dir/pipeline
+analysis_dir=$output_dir/analysis
 
 # set files
-final_results=$analysis_dir/reports/final_results_$date_stamp.csv
+final_results=$analysis_dir/reports/final_results_$today_date.csv
 pipeline_log=$log_dir/pipeline_log.txt
 multiqc_config="$log_dir/config/config_multiqc.yaml"
 pipeline_config="$log_dir/config/config_pipeline.yaml"
 cecret_config="$log_dir/config/config_cecret.config"
 
-# ncbi dir to hold until completion of sampling
-ncbi_hold="../ncbi_hold/$project_id"
+#############################################################################################
+# Runmodes
+#############################################################################################
+if [[ "$pipeline" == "phase1" ]]; then
+	bash run_analysis_pipeline.sh -n $project_id -p init
 
-#############################################################################################
-# Run CECRET
-#############################################################################################
-if [[ "$pipeline" == "init" ]]; then
+	bash run_analysis_pipeline.sh -n $project_id -p analysis -s ALL
+
+	bash run_analysis_pipeline.sh -n $project_id -p gisaid -s ALL
+
+elif [[ "$pipeline" == "init" ]]; then
 	
 	# print message
 	echo
 	echo "*** INITIALIZING PIPELINE ***"
 
-	#make directories, logs
-    if [[ ! -d $output_dir ]]; then mkdir $output_dir; fi
-
+	# make directories, logs
     ## parent
-	dir_list=(logs rawdata pipeline tmp analysis)
-    for pd in "${dir_list[@]}"; do if [[ ! -d $output_dir/$pd ]]; then mkdir -p $output_dir/$pd; fi; done
-
-    ## tmp
-    dir_list=(fastqc unzipped)
-    for pd in "${dir_list[@]}"; do if [[ ! -d $tmp_dir/$pd ]]; then mkdir -p $tmp_dir/$pd; fi; done
-
+	dir_list=(logs tmp analysis ncbi)
+    for pd in "${dir_list[@]}"; do makeDirs $output_dir/$pd; done
+    
 	## logs
-	dir_list=(config manifests pipeline gisaid ncbi)
-    for pd in "${dir_list[@]}"; do if [[ ! -d $log_dir/$pd ]]; then mkdir -p $log_dir/$pd; fi; done
-
-    ## analysis
-    dir_list=(fasta intermed qc reports)
-    for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/$pd ]]; then mkdir -p $analysis_dir/$pd; fi; done
+	dir_list=(config manifests/complete pipeline gisaid ncbi)
+    for pd in "${dir_list[@]}"; do makeDirs $log_dir/$pd; done
+	touch $log_dir/manifests/sample_ids.txt
 	
-	#### fasta
-	dir_list=(not_uploaded gisaid_complete upload_failed)
-    for pd in "${dir_list[@]}"; do if [[ ! -d $analysis_dir/fasta/$pd ]]; then mkdir -p $analysis_dir/fasta/$pd; fi; done
+	## tmp
+    dir_list=(qc)
+    for pd in "${dir_list[@]}"; do makeDirs $tmp_dir/$pd; done
+	
+    ## analysis
+    dir_list=(fasta intermed reports)
+    for pd in "${dir_list[@]}"; do makeDirs $analysis_dir/$pd; done
 
     ##log file
     touch $pipeline_log
@@ -148,106 +145,47 @@ if [[ "$pipeline" == "init" ]]; then
 	#update metadata name
 	sed -i "s~metadata.csv~${log_dir}/manifests/metadata-${project_name}.csv~" "${log_dir}/config/config_pipeline.yaml" 
 
+	# copy report scripts
+	cp scripts/COVID* $analysis_dir/reports
+
   	#output
 	echo -e "Configs are ready to be edited:\n${log_dir}/config"
 	echo "*** INITIALIZATION COMPLETE ***"
 	echo
 
-elif [[ "$pipeline" == "update" ]]; then
-
-    #update the staphb toolkit
-    staphb-tk --auto_update
-
-elif [[ "$pipeline" == "validation" ]]; then
-	# remove prev runs
-	sudo rm -rf ~/output/OH-VH00648-231124
-
-	# init
-	bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p init
-
-	# run through workflow
-    bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s DOWNLOAD
-    bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s BATCH -t Y
-	# cp -r ~/output/OH-VH00648-231124/savelogs ~/output/OH-VH00648-231124/logs
-	# cp  -r ~/output/OH-VH00648-231124/savetmp ~/output/OH-VH00648-231124/tmp
-    bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s ANALYZE -t Y -r N
-    # bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s REPORT -t Y
-    # bash run_analysis_pipeline.sh -n OH-VH00648-231124 -p sarscov2 -s lala -t Y
-elif [[ "$pipeline" == "sarscov2" ]]; then
+elif [[ "$pipeline" == "analysis" ]]; then
 	
 	#############################################################################################
     # Run CECRET pipeline
 	#############################################################################################
-   	message_cmd_log "------------------------------------------------------------------------"
-    message_cmd_log "--- STARTING SARS-COV2 PIPELINE ---"
-
 	# check initialization was completed
 	check_initialization
 
     # run SARS-COV2 pipeline
-	bash scripts/analysis.sh \
+	bash scripts/core_analysis.sh \
 		"${output_dir}" \
 		"${project_name_full}" \
 		"${pipeline_config}" \
 		"${cecret_config}" \
 		"${multiqc_config}" \
-		"${date_stamp}" \
+		"${proj_date}" \
 		"${pipeline_log}" \
 		"${subworkflow}" \
 		"${resume}" \
 		"${testing}"
 
-	# run QC
-	# bash scripts/seq_qc.sh \
-	# 	"${output_dir}" \
-	# 	"${pipeline_config}"
-
 elif [[ "$pipeline" == "gisaid" ]]; then
-	#########################################################
-	# Eval, source
-	#########################################################
-	eval $(parse_yaml ${pipeline_config} "config_")
-
 	############################################################################################
     # Run GISAID UPLOAD
     #############################################################################################
-	message_cmd_log "------------------------------------------------------------------------"
-	message_cmd_log "--- STARTING GISAID PIPELINE ---"
-
-   	# determine number of samples
-	fasta_number=`ls "$analysis_dir/fasta/not_uploaded"/ | wc -l`
-		
-	# run QC on fasta samples
-	if [[ "$fasta_number" -gt 0 ]]; then 
-		echo "----Processing $fasta_number samples"
-	        
-		# check metadata file exists
-        if [[ ! -f $config_metadata_file ]]; then
-        	echo "----Missing metadata file $config_metadata_file. File must be located in $log_dir. Review config_pipeline to update file name."
-        	exit
-    	fi
-	else
-		echo "----Missing fasta files"
-		#exit
-	fi
-		
-	# log
-	echo "--uploading samples" >> $pipeline_log
-        	
 	# run gisaid script
-    bash scripts/gisaid.sh \
+    bash scripts/core_gisaid.sh \
 		"${output_dir}" \
 		"${project_id}" \
 		"${pipeline_config}" \
 		"${final_results}" \
-		"${subworkflow}" 2>> "$pipeline_log"
-        
-	# # run stats
-    # bash run_analysis_pipeline.sh -m stats -n $project_id
-
-	# log
-	message_cmd_log "--- GISAID PIPELINE COMPLETE ---"
-	message_cmd_log "------------------------------------------------------------------------"
+		"${subworkflow}"  \
+		"${proj_date}"
 elif [[ "$pipeline" == "ncbi" ]]; then
 	
     ##########################################################
@@ -262,8 +200,8 @@ elif [[ "$pipeline" == "ncbi" ]]; then
 	message_cmd_log "--- STARTING NCBI PIPELINE ---"
 
 	# set args
-	date_stamp=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
-	ncbi_mput=$log_dir/${project_id}_${date_stamp}_mput.txt
+	proj_date=`echo 20$project_name | sed 's/OH-[A-Z]*[0-9]*-//'`
+	ncbi_mput=$log_dir/${project_id}_${proj_date}_mput.txt
 	gisaid_results=$analysis_dir/intermed/gisaid_results.csv
 
     # Eval YAML args
@@ -318,57 +256,6 @@ elif [[ "$pipeline" == "ncbi" ]]; then
 
 	# complete
 	message_cmd_log "--- COMPLETED NCBI PIPELINE ---"
-
-elif [[ "$pipeline" == "stats" ]]; then
-        
-	# create stats file
-	stats_log=$log_dir/stats.txt
-	touch $stats_log
-
-	################ General
-	message_stats_log "*** RUNNING PIPELINE STATS ***"
-	
-	# total number
-    val=`ls ${output_dir}/analysis/fasta/*/*.fa | wc -l`
-	message_stats_log "--Total number of samples $val"
-	
-	# number failed pipeline QC
-	val1=`cat $final_results | grep "qc_fail" | grep -v "missing_metadata" | grep -v "gisaid_rejected" | grep -v "gisaid_fail" |  wc -l`
-	message_stats_log "----Number failed pipeline QC: $val1"
-
-	# number of samples with missing metadata
-    val2=`cat $final_results | grep "missing" | wc -l`
-    message_stats_log "----Number missing metadata: $val2"
-    if [[ $val2 -gt 0 ]]; then
-    	cat $intermed_dir/gisaid_results.csv | grep "missing" > $log_dir/missing_metadata.csv
-    	sed -i "s/gisaid_fail/$project_id/g" $log_dir/missing_metadata.csv
-    fi
-	
-	val=$((val-val1-val2))
-    message_stats_log "----Number pased pipeline QC: $val"
-
-	################# GISAID
-	message_stats_log "-- GISAID STATS"
-	# number uploaded success
-	val=`cat $final_results | grep "gisaid_pass" | wc -l`
-	message_stats_log "---- Number GISAID uploaded successfully: $val"
-
-	# number failed upload
-    val=`cat $final_results | grep -e "gisaid_fail" -e "gisaid_rejected" | wc -l`
-	message_stats_log "---- Number GISAID uploaded and rejected: $val"
-	
-	################## NCBI
-	message_stats_log "-- NCBI Results"
-    # number passed upload
-    val=`cat $final_results | grep "ncbi_pass" | wc -l`
-    message_stats_log "---- Number NCBI uploaded: $val"
-
-    # number passed upload
-    val=`cat $final_results | grep "ncbi_duplicated" | wc -l`
-    message_stats_log "---- Number NCBI duplicated: $val"
-
-	message_stats_log "*** COMPLETE PIPELINE ***"
 else
-	echo "Pipeline options (-p) must be init, sarscov2, gisaid, ncbi, stats, update"
+	echo "Pipeline options (-p) must be init, analysis, gisaid, ncbi, stats, update"
 fi
-

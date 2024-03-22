@@ -21,7 +21,9 @@ batch_limit: "50"
 # 27 for 4.3-pdata-1.21
 # 28 for 4.3.1-pdata-1.22
 # 29 for 4.3.1-pdata-1.23.1
-pangolin_version: "29"
+# 30 for 4.3.1-pdata-1.25.1
+# 31 for 4.3.1-pdata-1.26
+pangolin_version: "31"
 
 # nextclade version
 # to check versions available to go: https://hub.docker.com/r/nextstrain/nextclade/tags
@@ -35,17 +37,22 @@ pangolin_version: "29"
 # 8 for nextstrain/nextclade:2.9.1
 # 9 for nextstrain/nextclade:2.14.0
 # 10 for nextstrain/nextclade:3.0.0-alpha.0
-nextclade_version: "10"
+# 11 for nextstrain/nextclade:3.3.1
+nextclade_version: "11"
 
 # staphb version
 # 1 for 3.10
 # 2 for 2.0
 # 3 for 3.7.20230613
 # 4 for v3.10.20231205
-cecret_version: "4"
+# 5 for v3.13.20240319
+cecret_version: "5"
+
+# ODH Versions
+odh_version: "v4.0" 
 
 # cmds
-cecret_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/tools/cecret_2/Cecret -profile docker"
+cecret_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/SARS_CoV_2_Workflow/tools/Cecret -profile docker"
 basespace_cmd: "/home/ubuntu/tools/basespace"
 gisaid_cmd: "/home/ubuntu/.local/bin/cli3"
 
@@ -69,7 +76,6 @@ frag_plot_script: "/home/ubuntu/workflows/SARS_CoV_2_Workflow/scripts/fragment_p
 percent_n_cutoff: 50
 metadata_file: "metadata.csv"
 gisaid_auth: "/home/ubuntu/tools/gisaid/authtokens/gisaid.authtoken"
-
 submitter: "sevillas2"
 type: "betacoronavirus"
 passage: "Original"

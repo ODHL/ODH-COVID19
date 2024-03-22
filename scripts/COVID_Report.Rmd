@@ -1,5 +1,5 @@
 ---
-title: "SARS_Report"
+title: "SARS_Report: REP_ID"
 author: "Samatha Chill"
 date: "REP_TODAY"
 output: html_document
@@ -10,6 +10,7 @@ editor_options:
 ```{r setup, include=FALSE}
 project_id="REP_ID"
 project_date="REP_DATE"
+analysis_date="REP_ADATE"
 ```
 
 ```{r, include=FALSE}
@@ -20,8 +21,8 @@ library(DT)
 
 ```{r, include=FALSE}
 #set dir
-project_dir=paste0("//LABAUTHDC2/Shared/Micro/WGS/Coronavirus_WGS/COVID-19 Fastas/",project_id)
-project_file=paste0(project_dir,"/analysis/reports/final_results_",project_date,".csv")
+project_dir=paste0("L://Micro/WGS/Coronavirus_WGS/COVID-19 Fastas/",project_id)
+project_file=paste0(project_dir,"/analysis/reports/final_results_",analysis_date,".csv")
 qc_file=paste0(project_dir,"/analysis/intermed/cecret_results.txt")
   
 #read in file
@@ -39,7 +40,7 @@ pass_df$major=vapply(strsplit(pass_df$pangolin_lineage,"[.]"),
 
 #read in QC
 qc_csv=read.csv(qc_file,sep="\t")
-qc_csv$depth=vapply(strsplit(as.character(qc_csv$X1X_coverage_after_trimming),"[.]"), 
+qc_csv$depth=vapply(strsplit(as.character(qc_csv$samtools_per_1X_coverage_after_trimming),"[.]"), 
                      `[`, 1, FUN.VALUE=character(1))
 
 # create pass/fail qc
@@ -52,9 +53,11 @@ fail_qc=subset(qc_csv,sample_id %in% fail_df$sample_id)
 ### Pipeline Information
 - Cecret config: /home/ubuntu/output/REP_ID/logs/config_cecret.config
 - Sequence run date: REP_DATE
-- Pangolin version: 4.3.1-pdata-1.23.1
-- Nextclade version: 3.0.0-alpha.0
-- Cecret version: 3.10.20231205
+- Pangolin version: REP_PANGO
+- Nextclade version: REP_NC
+- Cecret version: REP_CECRET
+- Primer version: REP_PRIME
+- Insert version: REP_INSERT
 
 ### All Samples
 ```{r echo=FALSE}
@@ -70,6 +73,10 @@ Depth of coverage for all passing samples
 ggplot(pass_qc, aes(x = depth)) +
   geom_bar() + 
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+```{r echo=FALSE, out.width = '100%'}
+knitr::include_graphics("L://Micro//WGS//Coronavirus_WGS//COVID-19 Fastas//REP_ID//analysis//intermed//fragment_plot.png", error = FALSE)
 ```
 
 ```{r echo=FALSE}
