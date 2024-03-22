@@ -38,6 +38,18 @@
             "hidden": true,
             "default": "--min-length 400 --max-length 700"
         },
+        "bbnorm": { 
+            "type": "boolean",
+            "hidden": true,
+            "default": false,
+            "description": "Specifies if process should be used"
+        },
+        "bbnorm_options": { 
+            "type": "string",
+            "hidden": true,
+            "default": "target=200 min=5",
+            "description": "Options for process"
+        },
         "bcftools_variants": { 
             "type": "boolean",
             "hidden": true,
@@ -122,7 +134,6 @@
         "freyja_demix_options": { 
             "type": "string",
             "hidden": true,
-            "default": "--depthcutoff 100",
             "description": "Options for process"
         },
         "freyja_plot_filetype": { 
@@ -276,9 +287,9 @@
             "type": "string",
             "hidden": true,
             "default": "mafft",
-            "description": "Specifies what tool to use for multiple sequence alignment. Current options are nextalign and mafft.",
+            "description": "Specifies what tool to use for multiple sequence alignment. Current options are nextclade and mafft.",
             "enum": [
-                "nextalign", 
+                "nextclade", 
                 "mafft"
             ]
         },
@@ -302,12 +313,6 @@
             "hidden": true,
             "description": "Directory with nanopore fastq files"
         },
-        "nextalign_options": { 
-            "type": "string",
-            "hidden": true,
-            "default": "--include-reference",
-            "description": "Options for process"
-        },
         "nextclade": { 
             "type": "boolean",
             "hidden": true,
@@ -329,6 +334,17 @@
             "type": "string",
             "default": "cecret",
             "description": "Specifies where results are saved"
+        },
+        "pango_collapse":{
+            "type": "boolean",
+            "hidden": true,
+            "default": true,
+            "description": "Specifies if process should be used"
+        },
+        "pango_collapse_options": { 
+            "type": "string",
+            "hidden": true,
+            "description": "Options for process"
         },
         "pangolin": { 
             "type": "boolean",

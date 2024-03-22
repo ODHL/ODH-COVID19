@@ -18,212 +18,27 @@ println('')
 println('Cecret is named after a real lake!')
 println('Visit https://www.alltrails.com/trail/us/utah/cecret-lake-trail to learn more.')
 println('Not everyone can visit in person, so here is some ASCII art of nucleotides in lake forming a consensus sequence.')
-println('                    _________ ______')
-println('               _ /      G    A   T   \\_____')
-println('          __/    C      C A    G      T  C \\')
-println('        /    G     A   T   T  A   G  G    T  \\_')
-println('        | G       G  C   A            G   T     \\')  
-println('        \\      A     C     G   A   T    A  G  T  \\__')
-println('         \\_           C       G    ____ _____ __ C  \\________')
-println('            \\__T______ ___________/                \\ C T G A G G T C G A T A') 
+println('             _________ ______')
+println('        _ /      G    A   T   \\_____')
+println('   __/    C      C A    G      T  C \\')
+println(' /    G     A   T   T  A   G  G    T  \\_')
+println('| G       G  C   A            G   T     \\')  
+println(' \\      A     C     G   A   T    A  G  T  \\__')
+println('  \\_           C       G    ____ _____ __ C  \\________')
+println('     \\__T______ ___________/                \\ C T G A G G T C G A T A') 
+println('                                                    A T G A C GTAGATA')
 println('')
-println('')
-
-
-log.info """\
-NF version: $nextflow.version
-profile: $workflow.profile
-launchDir: $workflow.launchDir
-workDir: $workflow.workDir
-outDir: $params.outdir
-"""
-.stripIndent()
-
-//# copying the confit template and ending the workflow
-params.config_file                          = "${params.outdir}/config_cecret.config"
-// if (params.config_file) {
-//   def src = new File("${workflow.projectDir}/configs/cecret_config_template.config")
-//   def dst = new File("${workflow.launchDir}/edit_me.config")
-//   dst << src.text
-//   println('A config file can be found at ' + workflow.launchDir + '/edit_me.config')
-//   exit 0
-// }
-
-//# Warning people about legacy params for a few versions. This was put here 3.6.20230418
-params.kraken2_organism                     = false
-if (params.kraken2_organism ) {
-  println('WARNING : params.kraken2_organism no longer does anything!')
-}
-params.bedtools_multicov                    = false
-if (params.bedtools_multicov ) {
-  println('WARNING : params.bedtools_multicov no longer does anything!')
-}
-params.bedtools_multicov_options            = false
-if (params.bedtools_multicov_options ) {
-  println('WARNING : params.bedtools_multicov_options no longer does anything!')
-}
-params.freyja_boot_options                  = false
-if (params.freyja_boot_options  ) {
-  println('WARNING : params.freyja_boot_options no longer does anything!')
-}
 
 //# Starting the workflow --------------------------------------------------------------
 
 nextflow.enable.dsl = 2
 
-//# params and their default values
-
-//# params for inputs including fasta and fastq files
-params.sample_sheet                         = ''
-params.reads                                = workflow.launchDir + '/reads'
-params.single_reads                         = workflow.launchDir + '/single_reads'
-params.fastas                               = workflow.launchDir + '/fastas'
-params.multifastas                          = workflow.launchDir + '/multifastas'
-params.nanopore                             = workflow.launchDir + '/nanopore'
-params.sra_accessions                       = []
-params.primer_bed                           = ''
-params.amplicon_bed                         = ''
-params.primer_set                           = 'ncov_V4'
-params.reference_genome                     = ''
-params.gff                                  = ''
-
-//# input checks ---------------------------------------------------------------------
-
-//# Ensuring that reads and single_reads are not set to the same directory
-if ( params.reads == params.single_reads ) {
-  println('\'params.reads\' and \'params.single_reads\' cannot point to the same directory!')
-  println('\'params.reads\' is set to ' + params.reads)
-  println('\'params.single_reads\' is set to ' + params.single_reads)
-  exit 1
-}
-
-if ( params.fastas == params.multifastas ) {
-  println('\'params.fastas\' and \'params.multifastas\' cannot point to the same directory!')
-  println('\'params.fastas\' is set to ' + params.fastas)
-  println('\'params.multifastas\' is set to ' + params.multifastas)
-  exit 1
-}
-
 //# run params ---------------------------------------------------------------------
-
-//# outdir params
-params.outdir                               = workflow.launchDir + '/cecret'
-params.species                              = 'sarscov2'
 println('The files and directory for results is ' + params.outdir)
 println('The species used to determine default variables and subworkflows is ' + params.species)
 
-//# roughly grouping cpu usage
-params.maxcpus                              = 8
-params.medcpus                              = 4
+//# roughly grouping cp5u usage
 println('The maximum number of CPUS used in this workflow is ' + params.maxcpus)
-
-//# specifying the core workflow
-params.trimmer                              = 'ivar'
-params.cleaner                              = 'seqyclean'
-params.aligner                              = 'bwa'
-params.msa                                  = 'mafft'
-
-//# to toggle off processes
-params.aci                                  = true
-params.bcftools_variants                    = true
-params.fastqc                               = true
-params.igv_reports                          = true
-params.ivar_variants                        = true
-params.samtools_stats                       = true
-params.samtools_coverage                    = true
-params.samtools_depth                       = true
-params.samtools_flagstat                    = true
-params.samtools_ampliconstats               = true
-params.samtools_plot_ampliconstats          = true
-params.markdup                              = false
-params.filter                               = false
-params.multiqc                              = true
-
-//# for optional route of tree generation and counting snps between samples
-params.relatedness                          = false
-params.snpdists                             = true
-params.iqtree2                              = true
-params.heatcluster                          = true
-params.phytreeviz                           = true
-
-//# parameters for processes with their default values
-params.artic_options                        = '--normalise 200 --skip-nanopolish --medaka --medaka-model r941_min_high_g360'
-params.artic_read_filtering_options         = '--min-length 400 --max-length 700'
-params.bcftools_variants_options            = ''
-params.fastp_options                        = ''
-params.fastqc_options                       = ''
-params.filter_options                       = ''
-params.heatcluster_options                  = '-t png'
-params.igv_reports_options                  = '--flanking 1000'
-params.iqtree2_options                      = '-ninit 2 -n 2 -me 0.05 -m GTR'
-params.ivar_consensus_options               = '-q 20 -t 0.6 -n N'
-params.ivar_trim_options                    = ''
-params.ivar_variants_options                = '-q 20 -t 0.6'
-params.minimap2_options                     = '-K 20M'
-params.minimum_depth                        = 100
-params.mpileup_depth                        = 8000
-params.multiqc_options                      = ''
-params.mafft_options                        = '--maxambiguous 0.5'
-params.phytreeviz_options                   = ''
-params.samtools_ampliconclip_options        = ''
-params.samtools_coverage_options            = ''
-params.samtools_flagstat_options            = ''
-params.samtools_depth_options               = ''
-params.samtools_stats_options               = ''
-params.samtools_ampliconstats_options       = '--max-amplicon-length 3000 --max-amplicons 3000'
-params.samtools_plot_ampliconstats_options  = '-size 1200,900 -size2 1200,900 -size3 1200,900'
-params.samtools_markdup_options             = ''
-params.samtools_fixmate_options             = ''
-params.seqyclean_contaminant_file           = '/Adapters_plus_PhiX_174.fasta'
-params.seqyclean_options                    = '-minlen 25 -qual'
-params.snpdists_options                     = '-c'
-
-//# for optional contamination determination
-params.kraken2                              = false
-params.kraken2_db                           = false
-params.kraken2_options                      = ''
-
-//# for using an included version of nextclade dataset
-params.download_nextclade_dataset           = true
-
-//# organism specific
-params.freyja                               = true
-params.freyja_aggregate                     = true
-params.nextclade                            = true
-params.pangolin                             = true
-params.vadr                                 = true
-
-params.pangolin_options                     = ''
-params.vadr_mdir                            = '/opt/vadr/vadr-models'
-params.nextclade_options                    = ''
-params.nextalign_options                    = '--include-reference'
-params.freyja_variants_options              = ''
-params.freyja_demix_options                 = "--depthcutoff ${params.minimum_depth}"
-
-params.freyja_aggregate_options             = ''
-params.freyja_plot_options                  = ""
-params.freyja_plot_filetype                 = 'png'
-
-//# Specifying some species-specific params
-if ( params.species == 'sarscov2' ) {
-  params.nextclade_dataset                  = 'sars-cov-2'
-  params.vadr_options                       = '--split --glsearch -s -r --nomisc --lowsim5seq 6 --lowsim3seq 6 --alt_fail lowscore,insertnn,deletinn'
-  params.vadr_reference                     = 'sarscov2'
-  params.vadr_trim_options                  = '--minlen 50 --maxlen 30000'
-  params.iqtree2_outgroup                   = 'MN908947'
-} else if ( params.species == 'mpx' ) {
-  params.nextclade_dataset                  = 'hMPXV'
-  params.vadr_options                       = '--split --glsearch -s -r --nomisc --r_lowsimok --r_lowsimxd 100 --r_lowsimxl 2000 --alt_pass discontn,dupregin'
-  params.vadr_reference                     = 'mpxv'
-  params.vadr_trim_options                  = '--minlen 50 --maxlen 210000'
-  params.iqtree2_outgroup                   = 'NC_063383'
-} else {
-  params.nextclade_dataset                  = ''
-  params.vadr_options                       = ''
-  params.vadr_reference                     = ''
-  params.vadr_trim_options                  = ''
-  params.iqtree2_outgroup                   = ''
-}
 
 //# Adding in subworkflows
 include { fasta_prep ; summary } from './modules/cecret.nf'      addParams(params)
@@ -464,6 +279,7 @@ if ( params.trimmer != 'none' ) {
 //# scripts for legacy reasons
 ch_combine_results_script = Channel.fromPath("${workflow.projectDir}/bin/combine_results.py",  type:'file')
 ch_freyja_script          = Channel.fromPath("${workflow.projectDir}/bin/freyja_graphs.py",    type:'file')
+ch_version_script         = Channel.fromPath("${workflow.projectDir}/bin/versions.py",         type:'file')
 
 if ( params.kraken2_db ) {
   Channel
@@ -501,6 +317,8 @@ ch_reads.ifEmpty     { println("No fastq or fastq.gz files were found at ${param
 workflow CECRET {
     ch_for_dataset = Channel.empty()
     ch_for_version = Channel.from("Cecret version", workflow.manifest.version).collect()
+    ch_prealigned  = Channel.empty()
+    ch_versions    = Channel.empty()
 
     if ( ! params.sra_accessions.isEmpty() ) { 
       test(ch_sra_accessions)
@@ -510,6 +328,7 @@ workflow CECRET {
     fasta_prep(ch_fastas)
 
     cecret(ch_reads, ch_nanopore, ch_reference_genome, ch_primer_bed)
+    ch_versions = ch_versions.mix(cecret.out.versions)
 
     qc(ch_reads,
       cecret.out.clean_reads,
@@ -523,13 +342,16 @@ workflow CECRET {
 
     ch_for_multiqc = cecret.out.for_multiqc.mix(qc.out.for_multiqc)
     ch_for_summary = qc.out.for_summary
+    ch_versions    = ch_versions.mix(qc.out.versions)
 
     if ( params.species == 'sarscov2' ) {
       sarscov2(fasta_prep.out.fastas.mix(ch_multifastas).mix(cecret.out.consensus), cecret.out.trim_bam, ch_reference_genome, ch_nextclade_dataset, ch_freyja_script)
       
+      ch_prealigned  = sarscov2.out.prealigned
       ch_for_multiqc = ch_for_multiqc.mix(sarscov2.out.for_multiqc)
       ch_for_dataset = sarscov2.out.dataset
       ch_for_summary = ch_for_summary.mix(sarscov2.out.for_summary)
+      ch_versions    = ch_versions.mix(sarscov2.out.versions)
     
     } else if ( params.species == 'mpx') {
       mpx(fasta_prep.out.fastas.mix(ch_multifastas).mix(cecret.out.consensus), ch_nextclade_dataset)
@@ -537,6 +359,8 @@ workflow CECRET {
       ch_for_multiqc = ch_for_multiqc.mix(mpx.out.for_multiqc)
       ch_for_dataset = mpx.out.dataset
       ch_for_summary = ch_for_summary.mix(mpx.out.for_summary)
+      ch_prealigned  = mpx.out.prealigned
+      ch_versions    = ch_versions.mix(mpx.out.versions)
 
     } else if ( params.species == 'other') {
       other(fasta_prep.out.fastas.concat(ch_multifastas).mix(cecret.out.consensus), ch_nextclade_dataset)
@@ -544,17 +368,20 @@ workflow CECRET {
       ch_for_multiqc = ch_for_multiqc.mix(other.out.for_multiqc)
       ch_for_dataset = other.out.dataset
       ch_for_summary = ch_for_summary.mix(other.out.for_summary)
+      ch_prealigned  = other.out.prealigned
+      ch_versions    = ch_versions.mix(other.out.versions)
 
     } 
 
     if ( params.relatedness ) { 
-      msa(fasta_prep.out.fastas.concat(ch_multifastas).concat(cecret.out.consensus), ch_reference_genome, ch_for_dataset) 
+      msa(fasta_prep.out.fastas.concat(ch_multifastas).concat(cecret.out.consensus), ch_reference_genome, ch_prealigned) 
 
       tree      = msa.out.tree
       alignment = msa.out.msa
       matrix    = msa.out.matrix
 
       ch_for_multiqc = ch_for_multiqc.mix(msa.out.for_multiqc)
+      ch_versions    = ch_versions.mix(msa.out.versions)
 
     } else {
       tree      = Channel.empty()
@@ -562,7 +389,13 @@ workflow CECRET {
       matrix    = Channel.empty()
     }
 
-    multiqc_combine(ch_for_multiqc.collect())
+    ch_versions
+      .collectFile(
+        keepHeader: false,
+        name: "collated_versions.yml")
+      .set { ch_collated_versions }
+
+    multiqc_combine(ch_for_multiqc.mix(ch_collated_versions).collect(), ch_version_script)
 
     summary(
       ch_for_summary.mix(fasta_prep.out.fastas).mix(cecret.out.consensus).collect().map{it -> tuple([it])}

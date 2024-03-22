@@ -26,18 +26,21 @@ workflow qc {
   main:
     ch_for_multiqc = Channel.empty()
     ch_for_summary = Channel.empty()
+    ch_versions    = Channel.empty()
     
     fastqc(ch_raw_reads)
     ch_for_summary = ch_for_summary.mix(fastqc.out.fastq_name.collectFile(name: "fastq_names.csv", keepHeader: true ))
+    ch_versions    = ch_versions.mix(fastqc.out.versions.first())
 
     if ( ch_kraken2_db ) {
       kraken2(ch_clean_reads.combine(ch_kraken2_db))
       ch_for_multiqc = ch_for_multiqc.mix(kraken2.out.kraken2_files)
       ch_for_summary = ch_for_summary.mix(kraken2.out.kraken2_files)
+      ch_versions    = ch_versions.mix(kraken2.out.versions.first())
     }
 
     samtools_intial_stats( ch_sam)
-    aci(                   ch_trim_bam.map{ it -> tuple(it[1])}.collect().map{it -> tuple([it])}.combine(ch_amplicon_bed))
+    aci(                   ch_trim_bam.map{ it -> tuple(it[0], it[1])}.combine(ch_amplicon_bed))
     samtools_flagstat(     ch_trim_bam.map{ it -> tuple(it[0], it[1])})
     samtools_depth(        ch_trim_bam.map{ it -> tuple(it[0], it[1])})
     samtools_coverage(     ch_trim_bam.map{ it -> tuple(it[0], it[1])})
@@ -47,7 +50,25 @@ workflow qc {
     samtools_ampliconstats(ch_trim_bam.map{ it -> tuple(it[0], it[1])}.combine(ch_primer_bed))
     samtools_plot_ampliconstats(samtools_ampliconstats.out.samtools_ampliconstats_files)
 
-    //igv_reports(bcftools_variants.out.vcf)
+    ch_versions = ch_versions.mix(samtools_intial_stats.out.versions.first())
+    ch_versions = ch_versions.mix(aci.out.versions.first())
+    ch_versions = ch_versions.mix(samtools_flagstat.out.versions.first())
+    ch_versions = ch_versions.mix(samtools_depth.out.versions.first())
+    ch_versions = ch_versions.mix(samtools_coverage.out.versions.first())
+    ch_versions = ch_versions.mix(samtools_stats.out.versions.first())
+    ch_versions = ch_versions.mix(bcftools_variants.out.versions.first())
+    ch_versions = ch_versions.mix(ivar_variants.out.versions.first())
+    ch_versions = ch_versions.mix(samtools_ampliconstats.out.versions.first())
+    ch_versions = ch_versions.mix(samtools_plot_ampliconstats.out.versions.first())
+
+    bcftools_variants.out.vcf
+      .join(ch_trim_bam, by: 0)
+      .combine(ch_reference_genome)
+      .set{ for_igv_reports }
+
+    igv_reports(for_igv_reports)
+
+    ch_versions = ch_versions.mix(igv_reports.out.versions.first())
 
     samtools_coverage.out.samtools_coverage
       .collectFile(name: "samtools_coverage_summary.tsv",
@@ -55,9 +76,15 @@ workflow qc {
         storeDir: "${params.outdir}/samtools_coverage")
       .set { samtools_coverage_file }
 
+    aci.out.cov
+      .collectFile(name: "aci_coverage_summary.csv",
+        keepHeader: true,
+        storeDir: "${params.outdir}/aci")
+      .set { aci_coverage_file }
+
     //# All of these tools are for QC, so each needs to make it to the summary file if actually useful
     ch_for_summary = ch_for_summary
-      .mix(aci.out.cov)
+      .mix(aci_coverage_file)
       .mix(ivar_variants.out.variant_tsv)
       .mix(bcftools_variants.out.bcftools_variants_file)
       .mix(samtools_stats.out.samtools_stats_files)
@@ -68,4 +95,5 @@ workflow qc {
   emit:
     for_multiqc = ch_for_multiqc.mix(fastqc.out.fastqc_files).mix(samtools_intial_stats.out.samtools_stats_files).mix(samtools_flagstat.out.samtools_flagstat_files).mix(aci.out.for_multiqc)
     for_summary = ch_for_summary
+    versions    = ch_versions
 }

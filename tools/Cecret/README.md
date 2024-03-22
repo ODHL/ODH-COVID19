@@ -1,5 +1,8 @@
 # Cecret
 
+UPDATE : THIS README IS (albiet slowly) GETTING TURNED INTO A WIKI. YOU CAN CHECK OUR PROGRESS HERE: https://github.com/UPHL-BioNGS/Cecret/wiki
+
+
 Named after the beautiful [Cecret lake](https://en.wikipedia.org/wiki/Cecret_Lake)
 
 Location: 40.570°N 111.622°W , Elevation: 9,875 feet (3,010 m), [Hiking level: easy](https://www.alltrails.com/trail/us/utah/cecret-lake-trail)
@@ -202,7 +205,7 @@ The **End User** can adjust this by specifying the maximum cpus that one process
 ```
 nextflow run UPHL-BioNGS/Cecret -profile singularity --maxcpus <new value>
 ```
-It is important to remember that nextflow will attempt to utilize all CPUs available, and this value is restricted to one process. As a specific example, the prcoess 'bwa' will be allocated `'params.maxcpus'`. If there are 48 CPUs available and `'params.maxcpus = 8'`, then 6 samples can be run simultaneously.
+It is important to remember that nextflow will attempt to utilize all CPUs available, and this value is restricted to one process. As a specific example, the prcoess 'bwa' will be allocated `'params.maxcpus'`. If there are 48 CPUs available and `'params.maxcpus = 8'`, then 6 samples will be run simultaneously.
 
 ## Determining depth for base calls
 Sequencing has an intrinsic amount of error for every predicted base on a read. This error is reduced the more reads there are. As such, there is a minimum amount of depth that is required to call a base with ivar consensus, ivar variants, and bcftools variants. The main assumption of using this workflow is that the virus is clonal (i.e. only one infection represented in a sample) and created via pcr amplified libraries. The default depth for calling bases or finding variants is set with 'params.minimum_depth' with the default value being `'params.minimum_depth = 100'`. This parameter can be adjusted by the **END USER** in a config file or on the command line.
@@ -312,11 +315,11 @@ To create a multiple sequence alignment and corresponding phylogenetic tree and 
 ```
 nextflow run UPHL-BioNGS/Cecret -profile singularity --relatedness true
 ```
-### Using nextalign to for multiple sequence alignement instead of mafft
+### Using nextclade to for multiple sequence alignement instead of mafft
 ```
-nextflow run UPHL-BioNGS/Cecret -profile singularity --relatedness true --msa nextalign
+nextflow run UPHL-BioNGS/Cecret -profile singularity --relatedness true --msa nextclade
 ```
-Or set `params.msa = 'nextalign'` and `params.relatedness = true` in a config file
+Or set `params.msa = 'nextclade'` and `params.relatedness = true` in a config file
 
 And then you get trees like this which can visualized with [itol](https://itol.embl.de/) or [ggtree](https://github.com/YuLab-SMU/ggtree).
 ![alt text](images/w5IMLiHfkMm3fS3kgJVpRg.png)
@@ -337,21 +340,26 @@ params.kraken2_db = 'kraken2_db'
 ```
 
 ## The main components of Cecret are:
-- [aci](https://github.com/erinyoung/ACI) - for depth estimation over amplicons
+- [aci](https://github.com/erinyoung/ACI) - for depth estimation over amplicons (optional, set params.aci = true)
 - [artic network](https://github.com/artic-network) - for aligning and consensus creation of nanopore reads
+- [bbnorm](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbnorm-guide/) - for normalizing reads (optional, set params.bbnorm = true)
+- [bcftools](https://samtools.github.io/bcftools/bcftools.html) - for variants
 - [bwa](http://bio-bwa.sourceforge.net/) - for aligning reads to the reference
-- [fastp](https://github.com/OpenGene/fastp) - for cleaning reads ; optional, faster alternative to seqyclean
+- [fastp](https://github.com/OpenGene/fastp) - for cleaning reads ; (optional, set params.cleaner = 'fastp')
 - [fastqc](https://github.com/s-andrews/FastQC) - for QC metrics
 - [freyja](https://github.com/andersen-lab/Freyja) - for multiple SARS-CoV-2 lineage classifications
-- [iqtree2](http://www.iqtree.org/) - for phylogenetic tree generation (optional, relatedness must be set to "true")
-- [ivar](https://andersen-lab.github.io/ivar/html/manualpage.html) - calling variants and creating a consensus fasta; optional primer trimmer
+- [heatcluster](https://github.com/DrB-S/heatcluster) - for visualizing SNP matrices generated via SNP dists
+- [iqtree2](http://www.iqtree.org/) - for phylogenetic tree generation (optional, set params.relatedness = true)
+- [igv-reports](https://github.com/igvteam/igv-reports) - visualizing SNPs (optional, set params.igv_reports = true)
+- [ivar](https://andersen-lab.github.io/ivar/html/manualpage.html) - calling variants and creating a consensus fasta; default primer trimmer
 - [kraken2](https://ccb.jhu.edu/software/kraken2/) - for read classification
 - [mafft](https://mafft.cbrc.jp/alignment/software/) - for multiple sequence alignment (optional, relatedness must be set to "true")
-- [minimap2](https://github.com/lh3/minimap2) - an alternative to bwa
+- [minimap2](https://github.com/lh3/minimap2) - an alternative to bwa (optional, set params.aligner = minimap2 )
 - [multiqc](https://multiqc.info/) - summary of results
-- [nextalign](https://github.com/neherlab/nextalign) - for phylogenetic tree generation (optional, relatedness must be set to "true", and msa must be set to "nextalign")
-- [nextclade](https://clades.nextstrain.org/) - for SARS-CoV-2 clade classification
+- [nextclade](https://clades.nextstrain.org/) - for SARS-CoV-2 clade classification (optional: aligned fasta can be used from this analysis when relatedness is set to "true" and msa is set to "nextclade")
 - [pangolin](https://github.com/cov-lineages/pangolin) - for SARS-CoV-2 lineage classification
+- [pango collapse](https://github.com/MDU-PHL/pango-collapse) - for SARS-CoV-2 lineage tracing
+- [phytreeviz](https://github.com/moshi4/phyTreeViz) - for visualizing phylogenetic trees
 - [samtools](http://www.htslib.org/) - for QC metrics and sorting; optional primer trimmer; optional converting bam to fastq files; optional duplication marking
 - [seqyclean](https://github.com/ibest/seqyclean) - for cleaning reads
 - [snp-dists](https://github.com/tseemann/snp-dists) - for relatedness determination (optional, relatedness must be set to "true")
@@ -370,9 +378,11 @@ params.samtools_flagstat = true           # stats about the bam files
 params.samtools_ampliconstats = true      # stats about the amplicons
 params.samtools_plot_ampliconstats = true # images related to amplicon performance
 params.kraken2 = false                    # used to classify reads and needs a corresponding params.kraken2_db and organism if not SARS-CoV-2
-params.aci = true                         # coverage approximation of amplicons
+params.aci = false                        # coverage approximation of amplicons
+parms.igv_reports = false                 # SNP IGV images
 params.nextclade = true                   # SARS-CoV-2 clade determination
 params.pangolin = true                    # SARS-CoV-2 lineage determination
+params.pango_collapse = true              # SARS-CoV-2 lineage tracing
 params.freyja = true                      # multiple SARS-CoV-2 lineage determination
 params.vadr = false                       # NCBI fasta QC
 params.relatedness = false                # create multiple sequence alignments with input fastq and fasta files
@@ -390,6 +400,10 @@ params.multiqc = true                     # aggregates data into single report
 
 ```
 cecret                                # results from this workflow
+├── aci
+│   ├── amplicon_depth.csv
+│   ├── amplicon_depth_mqc.png
+│   └── amplicon_depth.png
 ├── aligned                           # aligned (with aligner) but untrimmed bam files with indexes
 │   ├── SRR13957125.sorted.bam
 │   ├── SRR13957125.sorted.bam.bai
@@ -479,6 +493,15 @@ cecret                                # results from this workflow
 │   ├── iqtree2.log
 │   ├── iqtree2.mldist
 │   └── iqtree2.treefile
+├── ivar_consensus
+│   ├── SRR13957125.consensus.fa
+│   ├── SRR13957125.consensus.qual.txt
+│   ├── SRR13957125_NTC.consensus.fa
+│   ├── SRR13957125_NTC.consensus.qual.txt
+│   ├── SRR13957170.consensus.fa
+│   ├── SRR13957170.consensus.qual.txt
+│   ├── SRR13957177.consensus.fa
+│   └── SRR13957177.consensus.qual.txt
 ├── ivar_trim                        # bam files after primers have been trimmed off the reads with ivar
 │   ├── SRR13957125_ivar.log
 │   ├── SRR13957125.primertrim.sorted.bam
@@ -551,6 +574,8 @@ cecret                                # results from this workflow
 │   ├── nextclade.insertions.csv
 │   ├── nextclade.json
 │   └── nextclade.tsv
+├── pango_collapse
+│   └── pango_collapse.csv
 ├── pangolin                         # pangolin results
 │   ├── combined.fasta
 │   └── lineage_report.csv
@@ -972,6 +997,7 @@ params.samtools_ampliconstats = false
 params.samtools_plot_ampliconstats = false
 params.aci = false
 params.pangolin = false
+params.pango_collapse = false
 params.freyja = false
 params.nextclade = false
 params.vadr = false
