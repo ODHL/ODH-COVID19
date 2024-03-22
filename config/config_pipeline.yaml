@@ -48,6 +48,9 @@ nextclade_version: "11"
 # 5 for v3.13.20240319
 cecret_version: "5"
 
+# ODH Versions
+odh_version: "v4.0" 
+
 # cmds
 cecret_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/SARS_CoV_2_Workflow/tools/Cecret -profile docker"
 basespace_cmd: "/home/ubuntu/tools/basespace"
