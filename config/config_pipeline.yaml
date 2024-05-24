@@ -40,7 +40,8 @@ pangolin_version: "32"
 # 10 for nextstrain/nextclade:3.0.0-alpha.0
 # 11 for nextstrain/nextclade:3.3.1
 # 12 for nextstrain/nextclade:3.4.0
-nextclade_version: "12"
+# 13 for nextstrain/nextclade:3.5.0
+nextclade_version: "13"
 
 # staphb version
 # 1 for 3.10
@@ -61,15 +62,16 @@ gisaid_cmd: "/home/ubuntu/.local/bin/cli3"
 # reference files
 reference_dir: "/home/ubuntu/refs"
 reference_genome: "MN908947.3.fasta"
-gff: "MN908947.3.gff"
+reference_gff: "MN908947.3.gff"
 
 # 4 for artic_V4.1_SARS-CoV-2.primer.bed
-# 5 for SARS-CoV-2_v5.2.0_1200.primer.bed
-primer_version: "5"
+# 5 for SARS-CoV-2_v5.3.2_1200.primer.bed
+primer_version: "6"
 
 # 4 for artic_V4.1_SARS-CoV-2.insert.bed
 # 5 for SARS-CoV-2_v5.2.0_1200.insert.bed
-insert_version: "5"
+# 6 for SARS-CoV-2_v5.3.2_1200.insert.bed
+insert_version: "6"
 
 # scripts
 frag_plot_script: "/home/ubuntu/workflows/SARS_CoV_2_Workflow/scripts/fragment_plots.py"

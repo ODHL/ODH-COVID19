@@ -114,7 +114,7 @@ update_config "nextclade:latest" "nextclade:$nextclade_version" $cecret_config
 # check file existence
 # escape / with \/ for sed replacement
 # replace the cecret config file with the reference selected
-reference_list=("reference_genome" "gff")
+reference_list=("reference_genome" "reference_gff")
 for ref_file in ${reference_list[@]}; do
     ref_line=$(cat "${pipeline_config}" | grep $ref_file)
     ref_path=`echo $config_reference_dir/${ref_line/"$ref_file": /} | tr -d '"'`
