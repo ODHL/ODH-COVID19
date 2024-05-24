@@ -23,7 +23,8 @@ batch_limit: "50"
 # 29 for 4.3.1-pdata-1.23.1
 # 30 for 4.3.1-pdata-1.25.1
 # 31 for 4.3.1-pdata-1.26
-pangolin_version: "31"
+# 32 for 4.3.1-pdata-1.27
+pangolin_version: "32"
 
 # nextclade version
 # to check versions available to go: https://hub.docker.com/r/nextstrain/nextclade/tags
@@ -38,7 +39,8 @@ pangolin_version: "31"
 # 9 for nextstrain/nextclade:2.14.0
 # 10 for nextstrain/nextclade:3.0.0-alpha.0
 # 11 for nextstrain/nextclade:3.3.1
-nextclade_version: "11"
+# 12 for nextstrain/nextclade:3.4.0
+nextclade_version: "12"
 
 # staphb version
 # 1 for 3.10

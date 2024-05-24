@@ -45,7 +45,7 @@ elif [[ $subworkflow == "TESTING" ]]; then
 else
 	echo "CHOOSE CORRECT FLAG -s: DOWNLOAD BATCH ANALYZE REPORT CLEAN ALL"
 	echo "YOU CHOOSE: $subworkflow"
-	EXIT
+	exit
 fi
 
 ##########################################################
@@ -504,10 +504,11 @@ if [[ $flag_report == "Y" ]]; then
 	# complete pipeline
 	if [[ -f $final_results ]]; then
 		if [[ $flag_cleanup == "Y" ]]; then sudo rm -r --force $tmp_dir; fi
-
+		
 		message_cmd_log "Ending time: `date`"
 		message_cmd_log "Ending space: `df . | sed -n '2 p' | awk '{print $5}'`"
 		message_cmd_log "--- CECRET PIPELINE COMPLETE ---"
+		cat $final_results | wc -l
 		message_cmd_log "------------------------------------------------------------------------"
 	else
 		echo "FAIL: Missing $final_results"
