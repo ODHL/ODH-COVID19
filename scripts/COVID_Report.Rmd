@@ -60,11 +60,23 @@ fail_qc=subset(qc_csv,sample_id %in% fail_df$sample_id)
 - Insert version: REP_INSERT
 
 ### All Samples
-```{r echo=FALSE}
-print(paste0("The total number of samples in project: ",nrow(final_csv)))
-print(paste0("The total number of samples passing project: ",nrow(pass_df)))
-print(paste0("The total number of samples failing project: ",nrow(fail_df)))
+
+```{r summarytext, echo=FALSE}
+# generate summary test for outupt
+pass_n=nrow(subset(final_csv, pango_status=="pass"))
+failed_n=nrow(subset(final_csv, pango_status!="pass"))
+failed_samples=subset(final_csv, pango_status!="pass")$specimen_id
+summaryTEXT=paste0("There were ", nrow(final_csv)," samples analyzed and ",
+                   pass_n, " samples passed quality control thresholds, while ",
+                   length(failed_samples)," failed.")
+if(failed_n>0){
+  summaryTEXT=paste0(summaryTEXT,
+                     " Failing samples included: ",
+                     paste(failed_samples,collapse=" | "),".")
+}
 ```
+
+`r summaryTEXT`
 
 ### Passing Samples
 

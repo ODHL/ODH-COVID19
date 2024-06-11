@@ -71,6 +71,11 @@ fi
 #########################################################
 # Code
 #########################################################
+# set keys
+username=`cat /home/ubuntu/tools/gisaid/keys | grep "username" | cut -f2 -d":"`
+password=`cat /home/ubuntu/tools/gisaid/keys | grep "password" | cut -f2 -d":"`
+clientid=`cat /home/ubuntu/tools/gisaid/keys | grep "clientid" | cut -f2 -d":"`
+
 if [[ "$flag_prep" == "Y" ]]; then
 	message_cmd_log "------------------------------------------------------------------------"
 	message_cmd_log "--- STARTING GISAID PIPELINE ---"
@@ -209,10 +214,11 @@ if [[ "$flag_upload" == "Y" ]]; then
 		$config_gisaid_cmd upload \
 		--metadata $batched_meta \
 		--fasta $batched_fasta \
-		--token $config_gisaid_auth \
 		--log $gisaid_log \
-		--failed $gisaid_failed \
-		--frameshift catch_novel
+		--frameshift catch_novel \
+		--username $username \
+		--password $password \
+		--clientid $clientid
 	fi
 fi
 

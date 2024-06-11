@@ -280,7 +280,7 @@ if [[ $flag_download == "Y" ]]; then
 	
 	# download full zips
 	$config_basespace_cmd download project --quiet -i $project_number -o $tmp_dir --extension=zip
-	echo $config_basespace_cmd download project --quiet -i $project_number -o $tmp_dir --extension=zip
+	echo $config_basespace_cmd download project --quiet -i $project_number -o $tmp_dir --extension=.zip
 
 	# for each batch
 	for (( batch_id=$batch_min; batch_id<=$batch_count; batch_id++ )); do
@@ -297,8 +297,10 @@ if [[ $flag_download == "Y" ]]; then
 		# read text file
 		IFS=$'\n' read -d '' -r -a batch_list < $batch_manifest
 
+		# download the fasttq files
+		echo "----download FQ files"
 		for sample_id in ${batch_list[@]}; do
-			$config_basespace_cmd download biosample --quiet -n "${sample_id}" -o $tmp_batch_dir
+			$config_basespace_cmd download biosample -n "${sample_id}" -o $tmp_batch_dir
 			
 			# unzip analysis file downloaded from DRAGEN to sample tmp dir - used in QC
 			# move needed files to general tmp dir
@@ -306,7 +308,7 @@ if [[ $flag_download == "Y" ]]; then
 			if [[ ! -d $tmp_dir/${sample_id} ]]; then mkdir -p $tmp_dir/${sample_id}; fi
 			if [[ $zip != "" ]]; then 
 				unzip -o -q ${zip} -d $tmp_dir/${sample_id}
-				mv $tmp_dir/${sample_id}/ma/* $tmp_qc_dir/			
+				mv $tmp_dir/${sample_id}/ma/* $tmp_qc_dir/		
 			fi
 		done
 

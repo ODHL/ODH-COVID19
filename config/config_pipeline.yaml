@@ -57,7 +57,7 @@ odh_version: "v4.0"
 # cmds
 cecret_cmd: "/home/ubuntu/tools/nextflow run /home/ubuntu/workflows/SARS_CoV_2_Workflow/tools/Cecret -profile docker"
 basespace_cmd: "/home/ubuntu/tools/basespace"
-gisaid_cmd: "/home/ubuntu/.local/bin/cli3"
+gisaid_cmd: "/home/ubuntu/tools/gisaid/covCLI"
 
 # reference files
 reference_dir: "/home/ubuntu/refs"
