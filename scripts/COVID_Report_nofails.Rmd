@@ -54,7 +54,7 @@ fail_qc=subset(qc_csv,sample_id %in% fail_df$sample_id)
 # generate summary test for outupt
 pass_n=nrow(subset(final_csv, pango_status=="pass"))
 failed_n=nrow(subset(final_csv, pango_status!="pass"))
-failed_samples=subset(final_csv, pango_status!="pass")$specimen_id
+failed_samples=subset(final_csv, pango_status!="pass")$sample_id
 summaryTEXT=paste0("There were ", nrow(final_csv)," samples analyzed and ",
                    pass_n, " samples passed quality control thresholds, while ",
                    length(failed_samples)," failed.")
