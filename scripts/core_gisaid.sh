@@ -191,9 +191,12 @@ if [[ "$flag_prep" == "Y" ]]; then
 					# skips the header line and any odd formatted /date lines that follow
 					echo ">$virus_name" | sed 's/*/-/g' >> $batched_fasta
 					cat "$f" | grep -v ">" | grep -v "/" >> $batched_fasta
+
+					echo "$sample_id is ready"
 				# if there is no metadata, not and fail
 				else
 					#add sample to results, move associated files
+					echo "--sample failed metadata check: $sample_id"
 					echo "$sample_id,qc_fail,qc_missing_metadata" >> $gisaid_results
 				fi
 			fi
