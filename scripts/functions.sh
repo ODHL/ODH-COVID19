@@ -82,7 +82,7 @@ update_config(){
 
 update_config_refs(){
     if [[ ! -f $2 ]]; then
-        echo "Reference file ($ref_file) is missing from $ref_path. Please update $pipeline_config"
+        echo "Reference file ($1) is missing from $ref_path. Please update $pipeline_config"
 		exit
 	fi
 

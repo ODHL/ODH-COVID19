@@ -71,6 +71,11 @@ fi
 #########################################################
 # Code
 #########################################################
+# set keys
+username=`cat /home/ubuntu/tools/gisaid/keys | grep "username" | cut -f2 -d":"`
+password=`cat /home/ubuntu/tools/gisaid/keys | grep "password" | cut -f2 -d":"`
+clientid=`cat /home/ubuntu/tools/gisaid/keys | grep "clientid" | cut -f2 -d":"`
+
 if [[ "$flag_prep" == "Y" ]]; then
 	message_cmd_log "------------------------------------------------------------------------"
 	message_cmd_log "--- STARTING GISAID PIPELINE ---"
@@ -186,9 +191,12 @@ if [[ "$flag_prep" == "Y" ]]; then
 					# skips the header line and any odd formatted /date lines that follow
 					echo ">$virus_name" | sed 's/*/-/g' >> $batched_fasta
 					cat "$f" | grep -v ">" | grep -v "/" >> $batched_fasta
+
+					echo "$sample_id is ready"
 				# if there is no metadata, not and fail
 				else
 					#add sample to results, move associated files
+					echo "--sample failed metadata check: $sample_id"
 					echo "$sample_id,qc_fail,qc_missing_metadata" >> $gisaid_results
 				fi
 			fi
@@ -209,10 +217,11 @@ if [[ "$flag_upload" == "Y" ]]; then
 		$config_gisaid_cmd upload \
 		--metadata $batched_meta \
 		--fasta $batched_fasta \
-		--token $config_gisaid_auth \
 		--log $gisaid_log \
-		--failed $gisaid_failed \
-		--frameshift catch_novel
+		--frameshift catch_novel \
+		--username $username \
+		--password $password \
+		--clientid $clientid
 	fi
 fi
 
