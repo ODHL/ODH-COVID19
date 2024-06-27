@@ -1,5 +1,4 @@
 *.swp
-bin/
 
 # ignore upload dir
 gisaid_upload/
