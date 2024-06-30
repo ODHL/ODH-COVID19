@@ -37,6 +37,7 @@ if exists(fastqc_file) and exists(fastq_names_file):
     fastq_both_df = pd.merge(fastq_R1_df, fastq_R2_df, left_on='sample',right_on='sample', how = 'left')
     fastqc_tmp_df = fastq_both_df[['sample', 'fastqc_raw_reads_1', 'fastqc_raw_reads_2']]
     
+    summary_df['sample_id'] = summary_df['sample_id'].astype(str)
     summary_df = pd.merge(summary_df, fastqc_tmp_df, left_on = 'sample_id', right_on = 'sample', how = 'outer' )
     summary_df['sample_id'].fillna(summary_df['sample'], inplace=True)
     summary_df.drop('sample', axis=1, inplace=True)
@@ -63,6 +64,7 @@ for file in fasta_files :
             fasta_df        = pd.concat([fasta_df, tmp_fasta_df], axis=0 )
 
 if not fasta_df.empty :
+    summary_df['sample_id'] = summary_df['sample_id'].astype(str)
     summary_df              = pd.merge(summary_df, fasta_df, left_on = 'sample_id', right_on = 'fasta_sample', how = 'outer')
     summary_df['sample_id'] = summary_df['sample_id'].fillna(summary_df['fasta_sample'])
     summary_df              = summary_df.drop('fasta_sample', axis=1)
@@ -272,6 +274,7 @@ if exists(samtools_coverage_file) :
     scov_df['samtools_per_1X_coverage_after_trimming'] = scov_df['coverage']
     scov_tmp_df = scov_df[['sample','samtools_meandepth_after_trimming','samtools_per_1X_coverage_after_trimming' ]]
 
+    scov_df['sample'] = scov_df['sample'].astype(str)
     summary_df              = pd.merge(summary_df, scov_df, left_on = 'sample_id', right_on = 'sample', how = 'outer')
     summary_df['sample_id'] = summary_df['sample_id'].fillna(summary_df['sample'])
     summary_df              = summary_df.drop('sample', axis=1)
